@@ -512,8 +512,11 @@ namespace WordMan
                 tabPositions[i] = (float)inputValues.TabPosition;
             }
 
-            // 创建多级列表模板
-            CreateListTemplate(levelCount, numberStyles, numberFormats, numberIndents, textIndents, afterNumberTypes, tabPositions, linkedStyles);
+            // 创建多级列表模板（封装为一个可撤销步骤，支持 Ctrl+Z）
+            Globals.ThisAddIn.ExecuteWithUndoRecord("应用多级列表", () =>
+            {
+                CreateListTemplate(levelCount, numberStyles, numberFormats, numberIndents, textIndents, afterNumberTypes, tabPositions, linkedStyles);
+            });
         }
 
         private void CreateListTemplate(int levelCount, int[] numberStyles, string[] numberFormats, 

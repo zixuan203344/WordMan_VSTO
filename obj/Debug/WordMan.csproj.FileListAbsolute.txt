@@ -19,3 +19,24 @@ D:\Users\YW\Documents\VSTO Develop\WordMan_VSTO\obj\Debug\WordMan.csproj.CoreCom
 D:\Users\YW\Documents\VSTO Develop\WordMan_VSTO\obj\Debug\WordMan.csproj.Up2Date
 D:\Users\YW\Documents\VSTO Develop\WordMan_VSTO\obj\Debug\WordMan.dll
 D:\Users\YW\Documents\VSTO Develop\WordMan_VSTO\obj\Debug\WordMan.pdb
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.csproj.AssemblyReference.cache
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.MultiLevel.LevelStyleSettingsForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.MultiLevelListForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.SplitAndMerge.DocumentMergeForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.StyleSelectionForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.StyleSettings.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.CommonSymbolForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.Properties.Resources.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.MainRibbon.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.GreekLetterForm.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.TypesettingTaskPane.resources
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.csproj.GenerateResource.cache
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.dll
+f:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.pdb
+F:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.csproj.CoreCompileInputs.cache
+F:\02_Program\c_sharp\Git\WordMan_VSTO\bin\Debug\WordMan.dll
+F:\02_Program\c_sharp\Git\WordMan_VSTO\bin\Debug\WordMan.pdb
+F:\02_Program\c_sharp\Git\WordMan_VSTO\bin\Debug\WordMan.dll.manifest
+F:\02_Program\c_sharp\Git\WordMan_VSTO\bin\Debug\WordMan.vsto
+F:\02_Program\c_sharp\Git\WordMan_VSTO\bin\Debug\Microsoft.Office.Tools.Common.v4.0.Utilities.dll
+F:\02_Program\c_sharp\Git\WordMan_VSTO\obj\Debug\WordMan.csproj.Up2Date

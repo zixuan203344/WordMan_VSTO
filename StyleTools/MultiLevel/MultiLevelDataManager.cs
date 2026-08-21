@@ -400,6 +400,56 @@ namespace WordMan
         #region Word API 辅助方法
 
         /// <summary>
+        /// 中文字体优先显示列表（与 Word 原生字体设置窗口一致，优先项排在最前）
+        /// </summary>
+        private static readonly string[] PreferredChnFonts = new string[]
+        {
+            "宋体", "仿宋", "仿宋_GB2312", "黑体", "微软雅黑", "方正小标宋简体", "隶书", "楷体", "楷体_GB2312"
+        };
+
+        /// <summary>
+        /// 西文字体特殊项（与 Word 原生字体设置窗口一致，显示在列表最前）
+        /// </summary>
+        private static readonly string[] PreferredEngFonts = new string[]
+        {
+            "+西文标题", "+西文正文", "(使用中文字体)"
+        };
+
+        /// <summary>
+        /// 获取中文字体下拉项：优先显示常用中文字体，其余按系统字体顺序
+        /// </summary>
+        public static List<string> GetChnFontItems()
+        {
+            var result = new List<string>();
+            foreach (var font in PreferredChnFonts)
+            {
+                if (!result.Contains(font)) result.Add(font);
+            }
+            foreach (var font in GetSystemFonts())
+            {
+                if (!result.Contains(font)) result.Add(font);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 获取西文字体下拉项：优先显示"+西文标题"、"+西文正文"、"(使用中文字体)"，其余按系统字体顺序
+        /// </summary>
+        public static List<string> GetEngFontItems()
+        {
+            var result = new List<string>();
+            foreach (var font in PreferredEngFonts)
+            {
+                if (!result.Contains(font)) result.Add(font);
+            }
+            foreach (var font in GetSystemFonts())
+            {
+                if (!result.Contains(font)) result.Add(font);
+            }
+            return result;
+        }
+
+        /// <summary>
         /// 获取系统字体列表
         /// </summary>
         public static List<string> GetSystemFonts()

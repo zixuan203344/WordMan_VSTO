@@ -319,8 +319,12 @@ namespace WordMan
             {
                 try
                 {
-                    var selection = Globals.ThisAddIn.Application.Selection;
-                    selection.TypeText(item.Symbol);
+                    // 插入符号（封装为一个可撤销步骤，支持 Ctrl+Z）
+                    Globals.ThisAddIn.ExecuteWithUndoRecord("插入符号", () =>
+                    {
+                        var selection = Globals.ThisAddIn.Application.Selection;
+                        selection.TypeText(item.Symbol);
+                    });
                 }
                 catch (Exception ex)
                 {

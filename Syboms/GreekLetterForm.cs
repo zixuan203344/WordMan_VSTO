@@ -94,15 +94,19 @@ namespace WordMan
 
             string toInsert = isUpper ? info.Upper : info.Lower;
 
-            var selection = Globals.ThisAddIn.Application.Selection;
-            selection.TypeText(toInsert);
+            // 插入希腊字母（封装为一个可撤销步骤，支持 Ctrl+Z）
+            Globals.ThisAddIn.ExecuteWithUndoRecord("插入希腊字母", () =>
+            {
+                var selection = Globals.ThisAddIn.Application.Selection;
+                selection.TypeText(toInsert);
 
-            // 选中刚插入的字母并设置样式
-            selection.MoveLeft(Word.WdUnits.wdCharacter, 1, Word.WdMovementType.wdExtend);
-            selection.Font.Name = "Times New Roman";
-            selection.Font.Italic = isItalic ? 1 : 0;
-            selection.Font.Bold = isBold ? 1 : 0;
-            selection.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+                // 选中刚插入的字母并设置样式
+                selection.MoveLeft(Word.WdUnits.wdCharacter, 1, Word.WdMovementType.wdExtend);
+                selection.Font.Name = "Times New Roman";
+                selection.Font.Italic = isItalic ? 1 : 0;
+                selection.Font.Bold = isBold ? 1 : 0;
+                selection.Collapse(Word.WdCollapseDirection.wdCollapseEnd);
+            });
         }
 
 

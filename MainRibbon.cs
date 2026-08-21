@@ -1,5 +1,6 @@
 ﻿using Microsoft.Office.Tools.Ribbon;
 using System;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Word = Microsoft.Office.Interop.Word;
 using WordMan.SplitAndMerge;
@@ -19,12 +20,16 @@ namespace WordMan
         private SplitAndMerge.DocumentMerger documentMerger;
         private DocumentSplitter documentSplitter;
         private MultiLevelListForm multiLevelListForm;
+        private StyleSettings styleSettingsForm; // 样式设置窗口（非模态单实例）
 
         #region 文本处理组
         // Word 内置功能
         private void 清除格式_Click(object sender, RibbonControlEventArgs e)
         {
-            textProcessor.ClearFormatting();
+            Globals.ThisAddIn.ExecuteWithUndoRecord("清除格式", () =>
+            {
+                textProcessor.ClearFormatting();
+            });
         }
 
         private void 格式刷_Click(object sender, RibbonControlEventArgs e)
@@ -35,7 +40,10 @@ namespace WordMan
 
         private void 只留文本_Click(object sender, RibbonControlEventArgs e)
         {
-            textProcessor.PasteTextOnly();
+            Globals.ThisAddIn.ExecuteWithUndoRecord("只留文本粘贴", () =>
+            {
+                textProcessor.PasteTextOnly();
+            });
         }
 
         private void 去除断行_Click(object sender, RibbonControlEventArgs e)
@@ -228,7 +236,10 @@ namespace WordMan
         {
             var toggleButton = sender as Microsoft.Office.Tools.Ribbon.RibbonToggleButton;
             // 直接执行Word内置命令
-            tableProcessor.RepeatHeaderRows();
+            Globals.ThisAddIn.ExecuteWithUndoRecord("重复标题行", () =>
+            {
+                tableProcessor.RepeatHeaderRows();
+            });
             // 执行命令后，延迟更新按钮状态以反映实际状态
             System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
             timer.Interval = 50;
@@ -259,17 +270,26 @@ namespace WordMan
         #region 题注与引用组
         private void 图注样式1_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetPictureStyle(图注样式1, 图注样式2, 图注样式3, CaptionNumberStyle.Arabic);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置图注样式1", () =>
+            {
+                captionManager.SetPictureStyle(图注样式1, 图注样式2, 图注样式3, CaptionNumberStyle.Arabic);
+            });
         }
 
         private void 图注样式2_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetPictureStyle(图注样式2, 图注样式1, 图注样式3, CaptionNumberStyle.Dash);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置图注样式2", () =>
+            {
+                captionManager.SetPictureStyle(图注样式2, 图注样式1, 图注样式3, CaptionNumberStyle.Dash);
+            });
         }
 
         private void 图注样式3_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetPictureStyle(图注样式3, 图注样式1, 图注样式2, CaptionNumberStyle.Dot);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置图注样式3", () =>
+            {
+                captionManager.SetPictureStyle(图注样式3, 图注样式1, 图注样式2, CaptionNumberStyle.Dot);
+            });
         }
 
         private void 图编号_Click(object sender, RibbonControlEventArgs e)
@@ -282,17 +302,26 @@ namespace WordMan
 
         private void 表注样式1_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetTableStyle(表注样式1, 表注样式2, 表注样式3, CaptionNumberStyle.Arabic);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置表注样式1", () =>
+            {
+                captionManager.SetTableStyle(表注样式1, 表注样式2, 表注样式3, CaptionNumberStyle.Arabic);
+            });
         }
 
         private void 表注样式2_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetTableStyle(表注样式2, 表注样式1, 表注样式3, CaptionNumberStyle.Dash);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置表注样式2", () =>
+            {
+                captionManager.SetTableStyle(表注样式2, 表注样式1, 表注样式3, CaptionNumberStyle.Dash);
+            });
         }
 
         private void 表注样式3_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetTableStyle(表注样式3, 表注样式1, 表注样式2, CaptionNumberStyle.Dot);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置表注样式3", () =>
+            {
+                captionManager.SetTableStyle(表注样式3, 表注样式1, 表注样式2, CaptionNumberStyle.Dot);
+            });
         }
 
         private void 表编号_Click(object sender, RibbonControlEventArgs e)
@@ -305,17 +334,26 @@ namespace WordMan
 
         private void 公式样式1_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetFormulaStyle(公式样式1, 公式样式2, 公式样式3, FormulaNumberStyle.Parenthesis1);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置公式样式1", () =>
+            {
+                captionManager.SetFormulaStyle(公式样式1, 公式样式2, 公式样式3, FormulaNumberStyle.Parenthesis1);
+            });
         }
 
         private void 公式样式2_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetFormulaStyle(公式样式2, 公式样式1, 公式样式3, FormulaNumberStyle.Parenthesis1_1);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置公式样式2", () =>
+            {
+                captionManager.SetFormulaStyle(公式样式2, 公式样式1, 公式样式3, FormulaNumberStyle.Parenthesis1_1);
+            });
         }
 
         private void 公式样式3_Click(object sender, RibbonControlEventArgs e)
         {
-            captionManager.SetFormulaStyle(公式样式3, 公式样式1, 公式样式2, FormulaNumberStyle.Parenthesis1_1dot);
+            Globals.ThisAddIn.ExecuteWithUndoRecord("设置公式样式3", () =>
+            {
+                captionManager.SetFormulaStyle(公式样式3, 公式样式1, 公式样式2, FormulaNumberStyle.Parenthesis1_1dot);
+            });
         }
 
         private void 式编号_Click(object sender, RibbonControlEventArgs e)
@@ -373,8 +411,52 @@ namespace WordMan
         {
             try
             {
-                var styleSettings = new StyleSettings();
-                styleSettings.ShowDialog();
+                // 非模态窗口：只打开一个实例，重复点击时激活已有窗口
+                if (styleSettingsForm == null || styleSettingsForm.IsDisposed)
+                {
+                    styleSettingsForm = new StyleSettings();
+                    styleSettingsForm.FormClosed += (s, args) => styleSettingsForm = null;
+                    styleSettingsForm.Show();
+
+                    // 设置 Word 主窗口为所有者，使窗口始终置于 Word 上方
+                    try
+                    {
+                        var wordHwnd = new IntPtr(Globals.ThisAddIn.Application.ActiveWindow?.Hwnd ?? 0);
+                        if (wordHwnd != IntPtr.Zero && styleSettingsForm.IsHandleCreated)
+                        {
+                            if (IntPtr.Size == 8)
+                            {
+                                NativeMethods.SetWindowLongPtr64(styleSettingsForm.Handle, NativeMethods.GWL_HWNDPARENT, wordHwnd);
+                            }
+                            else
+                            {
+                                NativeMethods.SetWindowLong32(styleSettingsForm.Handle, NativeMethods.GWL_HWNDPARENT, wordHwnd.ToInt32());
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // 设置所有者失败不影响窗口使用
+                    }
+                }
+                else
+                {
+                    // 窗口已打开：激活并重新读取当前文档样式（可能已切换文档）
+                    if (styleSettingsForm.WindowState == FormWindowState.Minimized)
+                    {
+                        styleSettingsForm.WindowState = FormWindowState.Normal;
+                    }
+                    styleSettingsForm.Activate();
+                    styleSettingsForm.BringToFront();
+                    try
+                    {
+                        styleSettingsForm.RefreshFromDocument();
+                    }
+                    catch
+                    {
+                        // 重新读取失败不影响窗口使用
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -498,5 +580,22 @@ namespace WordMan
         }
         #endregion
 
+    }
+
+    /// <summary>
+    /// Win32 原生方法辅助类（用于将样式设置窗口绑定到 Word 主窗口，使其始终置于 Word 上方）
+    /// </summary>
+    internal static class NativeMethods
+    {
+        /// <summary>
+        /// GWL_HWNDPARENT - 设置窗口的所有者窗口
+        /// </summary>
+        public const int GWL_HWNDPARENT = -8;
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLong", CharSet = CharSet.Auto)]
+        public static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", CharSet = CharSet.Auto)]
+        public static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
     }
 }

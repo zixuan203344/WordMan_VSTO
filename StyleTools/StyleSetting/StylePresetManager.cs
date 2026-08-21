@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using Microsoft.Office.Interop.Word;
 using WordMan.MultiLevel;
@@ -15,11 +16,19 @@ namespace WordMan
     public static class StylePresetManager
     {
         /// <summary>
-        /// 获取所有可用的预设样式名称
+        /// 获取所有可用的预设样式名称（内置预设 + 用户自定义预设）
         /// </summary>
         public static string[] GetPresetStyleNames()
         {
-            return new[] { "公文风格", "论文风格", "报告风格" };
+            var names = new List<string> { "公文风格", "论文风格", "报告风格" };
+            foreach (var preset in LoadCustomPresets())
+            {
+                if (!string.IsNullOrEmpty(preset.Name) && !names.Contains(preset.Name))
+                {
+                    names.Add(preset.Name);
+                }
+            }
+            return names.ToArray();
         }
 
         /// <summary>
@@ -36,6 +45,11 @@ namespace WordMan
                 case "报告风格":
                     return GetReportStyles();
                 default:
+                    var customPreset = LoadCustomPresets().FirstOrDefault(p => p.Name == presetName);
+                    if (customPreset != null && customPreset.Styles != null)
+                    {
+                        return customPreset.Styles;
+                    }
                     throw new ArgumentException($"未知的预设样式：{presetName}");
             }
         }
@@ -264,9 +278,9 @@ namespace WordMan
         /// </summary>
         private static void ApplyStyleToControls(CustomStyle style, StyleSettingsControls controls)
         {
-            // 设置字体 - 分别设置中文字体和英文字体
-            SetComboBoxSelection(controls.Cmb_ChnFontName, style.FontName, MultiLevelDataManager.GetSystemFonts());
-            SetComboBoxSelection(controls.Cmb_EngFontName, style.EngFontName, MultiLevelDataManager.GetSystemFonts());
+            // 设置字体 - 分别设置中文字体和英文字体（使用与窗体一致的优先字体列表）
+            SetComboBoxSelection(controls.Cmb_ChnFontName, style.FontName, MultiLevelDataManager.GetChnFontItems());
+            SetComboBoxSelection(controls.Cmb_EngFontName, style.EngFontName, MultiLevelDataManager.GetEngFontItems());
             
             // 设置字号 - 将磅值转换为中文字号
             string fontSizeText = MultiLevelDataManager.ConvertFontSizeToString(style.FontSize);
@@ -345,6 +359,97 @@ namespace WordMan
             {
                 comboBox.SelectedIndex = -1;
             }
+        }
+
+        #region 自定义预设持久化
+
+        /// <summary>
+        /// 获取自定义预设配置文件路径
+        /// </summary>
+        private static string GetPresetFilePath()
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WordMan");
+            return Path.Combine(dir, "StylePresets.xml");
+        }
+
+        /// <summary>
+        /// 加载所有自定义预设
+        /// </summary>
+        private static List<StylePresetData> LoadCustomPresets()
+        {
+            try
+            {
+                string filePath = GetPresetFilePath();
+                if (File.Exists(filePath))
+                {
+                    var collection = StyleFileManager.DeserializeFromXml<StylePresetCollection>(filePath);
+                    if (collection != null && collection.Presets != null)
+                    {
+                        return collection.Presets;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"加载自定义预设时出错：{ex.Message}");
+            }
+            return new List<StylePresetData>();
+        }
+
+        /// <summary>
+        /// 保存自定义预设（同名预设将被覆盖），保存后立即可在预设下拉列表中看到
+        /// </summary>
+        public static void SavePreset(StylePresetData preset)
+        {
+            if (preset == null || string.IsNullOrEmpty(preset.Name))
+                return;
+
+            var presets = LoadCustomPresets();
+            presets.RemoveAll(p => p.Name == preset.Name);
+            presets.Add(preset);
+
+            var collection = new StylePresetCollection { Presets = presets };
+            string filePath = GetPresetFilePath();
+            string dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+            StyleFileManager.SerializeToXml(collection, filePath);
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// 自定义预设数据
+    /// </summary>
+    public class StylePresetData
+    {
+        public string Name { get; set; }
+        public List<CustomStyle> Styles { get; set; }
+        public int TitleCount { get; set; }
+        public DateTime CreateTime { get; set; }
+
+        public StylePresetData()
+        {
+            Name = "";
+            Styles = new List<CustomStyle>();
+            TitleCount = 4;
+            CreateTime = DateTime.Now;
+        }
+    }
+
+    /// <summary>
+    /// 自定义预设集合（用于XML序列化）
+    /// </summary>
+    public class StylePresetCollection
+    {
+        public List<StylePresetData> Presets { get; set; }
+
+        public StylePresetCollection()
+        {
+            Presets = new List<StylePresetData>();
         }
     }
 

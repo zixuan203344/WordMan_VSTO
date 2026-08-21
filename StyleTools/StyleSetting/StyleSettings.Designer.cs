@@ -54,6 +54,14 @@ namespace WordMan
         private StandardNumericUpDown Nud_LeftIndent;
         private StandardNumericUpDown Nud_FirstLineIndent;
         private StandardButton 关闭;
+        private Label label20;
+        private StandardComboBox 样式基准下拉框;
+        private Label label21;
+        private StandardComboBox 后续段落样式下拉框;
+        private StandardButton 存预设;
+        private StandardButton 应用当前;
+        private System.Windows.Forms.StatusStrip StatusBar;
+        private System.Windows.Forms.ToolStripStatusLabel statusLabel;
 
         #endregion
 
@@ -94,6 +102,8 @@ namespace WordMan
             this.label18 = new System.Windows.Forms.Label();
             this.label19 = new System.Windows.Forms.Label();
             this.label7 = new System.Windows.Forms.Label();
+            this.label20 = new System.Windows.Forms.Label();
+            this.label21 = new System.Windows.Forms.Label();
             this.Lst_Styles = new System.Windows.Forms.ListBox();
             this.导入 = new WordMan.StandardButton();
             this.加载 = new WordMan.StandardButton();
@@ -118,9 +128,15 @@ namespace WordMan
             this.Nud_RightIndent = new WordMan.StandardNumericUpDown();
             this.首行缩进方式下拉框 = new WordMan.StandardComboBox();
             this.Nud_FirstLineIndent = new WordMan.StandardNumericUpDown();
+            this.样式基准下拉框 = new WordMan.StandardComboBox();
+            this.后续段落样式下拉框 = new WordMan.StandardComboBox();
             this.导出 = new WordMan.StandardButton();
             this.添加 = new WordMan.StandardButton();
             this.读取文档样式 = new WordMan.StandardButton();
+            this.存预设 = new WordMan.StandardButton();
+            this.应用当前 = new WordMan.StandardButton();
+            this.StatusBar = new System.Windows.Forms.StatusStrip();
+            this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.groupBox3.SuspendLayout();
             this.Pal_Font.SuspendLayout();
             this.Pal_ParaIndent.SuspendLayout();
@@ -145,11 +161,16 @@ namespace WordMan
             this.groupBox3.Controls.Add(this.label16);
             this.groupBox3.Controls.Add(this.Pal_ParaIndent);
             this.groupBox3.Controls.Add(this.导出);
+            this.groupBox3.Controls.Add(this.存预设);
+            this.groupBox3.Controls.Add(this.应用当前);
             this.groupBox3.Controls.Add(this.添加);
             this.groupBox3.Controls.Add(this.Lst_Styles);
+            this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox3.Location = new System.Drawing.Point(0, 0);
             this.groupBox3.Name = "groupBox3";
-            this.groupBox3.Size = new System.Drawing.Size(679, 374);
+            this.groupBox3.Size = new System.Drawing.Size(679, 401);
             this.groupBox3.TabIndex = 6;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "样式设置";
@@ -157,7 +178,7 @@ namespace WordMan
             // label12
             // 
             this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(470, 278);
+            this.label12.Location = new System.Drawing.Point(470, 320);
             this.label12.Name = "label12";
             this.label12.Size = new System.Drawing.Size(68, 17);
             this.label12.TabIndex = 20;
@@ -213,12 +234,88 @@ namespace WordMan
             // label16
             // 
             this.label16.AutoSize = true;
-            this.label16.Location = new System.Drawing.Point(192, 278);
+            this.label16.Location = new System.Drawing.Point(192, 320);
             this.label16.Name = "label16";
             this.label16.Size = new System.Drawing.Size(56, 17);
             this.label16.TabIndex = 9;
             this.label16.Text = "预设风格";
             this.label16.Click += new System.EventHandler(this.label16_Click);
+            // 
+            // label20
+            // 
+            this.label20.Location = new System.Drawing.Point(10, 140);
+            this.label20.Name = "label20";
+            this.label20.Size = new System.Drawing.Size(80, 30);
+            this.label20.TabIndex = 22;
+            this.label20.Text = "样式基准";
+            this.label20.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // label21
+            // 
+            this.label21.Location = new System.Drawing.Point(270, 140);
+            this.label21.Name = "label21";
+            this.label21.Size = new System.Drawing.Size(84, 30);
+            this.label21.TabIndex = 24;
+            this.label21.Text = "后续段落样式";
+            this.label21.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // 样式基准下拉框
+            // 
+            this.样式基准下拉框.AllowInput = false;
+            this.样式基准下拉框.BackColor = System.Drawing.Color.White;
+            this.样式基准下拉框.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.样式基准下拉框.Font = new System.Drawing.Font("微软雅黑", 9F);
+            this.样式基准下拉框.FormattingEnabled = true;
+            this.样式基准下拉框.Items.AddRange(new object[] {
+            "(无样式)",
+            "正文"});
+            this.样式基准下拉框.Location = new System.Drawing.Point(96, 140);
+            this.样式基准下拉框.Name = "样式基准下拉框";
+            this.样式基准下拉框.Size = new System.Drawing.Size(120, 25);
+            this.样式基准下拉框.TabIndex = 23;
+            // 
+            // 后续段落样式下拉框
+            // 
+            this.后续段落样式下拉框.AllowInput = false;
+            this.后续段落样式下拉框.BackColor = System.Drawing.Color.White;
+            this.后续段落样式下拉框.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.后续段落样式下拉框.Font = new System.Drawing.Font("微软雅黑", 9F);
+            this.后续段落样式下拉框.FormattingEnabled = true;
+            this.后续段落样式下拉框.Items.AddRange(new object[] {
+            "正文",
+            "无间隔"});
+            this.后续段落样式下拉框.Location = new System.Drawing.Point(354, 140);
+            this.后续段落样式下拉框.Name = "后续段落样式下拉框";
+            this.后续段落样式下拉框.Size = new System.Drawing.Size(120, 25);
+            this.后续段落样式下拉框.TabIndex = 25;
+            // 
+            // 存预设
+            // 
+            this.存预设.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(70)))), ((int)(((byte)(130)))), ((int)(((byte)(230)))));
+            this.存预设.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.存预设.FlatAppearance.BorderSize = 0;
+            this.存预设.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.存预设.ForeColor = System.Drawing.Color.White;
+            this.存预设.Location = new System.Drawing.Point(398, 380);
+            this.存预设.Name = "存预设";
+            this.存预设.Size = new System.Drawing.Size(50, 31);
+            this.存预设.TabIndex = 42;
+            this.存预设.Text = "存预设";
+            this.存预设.UseVisualStyleBackColor = false;
+            // 
+            // 应用当前
+            // 
+            this.应用当前.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(76)))), ((int)(((byte)(175)))), ((int)(((byte)(80)))));
+            this.应用当前.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.应用当前.FlatAppearance.BorderSize = 0;
+            this.应用当前.Font = new System.Drawing.Font("微软雅黑", 10F, System.Drawing.FontStyle.Bold);
+            this.应用当前.ForeColor = System.Drawing.Color.White;
+            this.应用当前.Location = new System.Drawing.Point(448, 380);
+            this.应用当前.Name = "应用当前";
+            this.应用当前.Size = new System.Drawing.Size(80, 31);
+            this.应用当前.TabIndex = 43;
+            this.应用当前.Text = "应用当前";
+            this.应用当前.UseVisualStyleBackColor = false;
             // 
             // Pal_ParaIndent
             // 
@@ -238,10 +335,14 @@ namespace WordMan
             this.Pal_ParaIndent.Controls.Add(this.首行缩进方式下拉框);
             this.Pal_ParaIndent.Controls.Add(this.label7);
             this.Pal_ParaIndent.Controls.Add(this.Nud_FirstLineIndent);
+            this.Pal_ParaIndent.Controls.Add(this.label20);
+            this.Pal_ParaIndent.Controls.Add(this.样式基准下拉框);
+            this.Pal_ParaIndent.Controls.Add(this.label21);
+            this.Pal_ParaIndent.Controls.Add(this.后续段落样式下拉框);
             this.Pal_ParaIndent.Enabled = false;
             this.Pal_ParaIndent.Location = new System.Drawing.Point(182, 120);
             this.Pal_ParaIndent.Name = "Pal_ParaIndent";
-            this.Pal_ParaIndent.Size = new System.Drawing.Size(486, 144);
+            this.Pal_ParaIndent.Size = new System.Drawing.Size(486, 180);
             this.Pal_ParaIndent.TabIndex = 7;
             this.Pal_ParaIndent.TabStop = false;
             this.Pal_ParaIndent.Text = "段落设置";
@@ -320,6 +421,8 @@ namespace WordMan
             // 
             // Lst_Styles
             // 
+            this.Lst_Styles.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
             this.Lst_Styles.FormattingEnabled = true;
             this.Lst_Styles.ItemHeight = 17;
             this.Lst_Styles.Location = new System.Drawing.Point(14, 23);
@@ -335,7 +438,7 @@ namespace WordMan
             this.导入.FlatAppearance.BorderSize = 0;
             this.导入.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.导入.ForeColor = System.Drawing.Color.White;
-            this.导入.Location = new System.Drawing.Point(278, 334);
+            this.导入.Location = new System.Drawing.Point(278, 380);
             this.导入.Name = "导入";
             this.导入.Size = new System.Drawing.Size(50, 31);
             this.导入.TabIndex = 40;
@@ -350,7 +453,7 @@ namespace WordMan
             this.加载.FlatAppearance.BorderSize = 0;
             this.加载.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.加载.ForeColor = System.Drawing.Color.White;
-            this.加载.Location = new System.Drawing.Point(14, 334);
+            this.加载.Location = new System.Drawing.Point(14, 380);
             this.加载.Name = "加载";
             this.加载.Size = new System.Drawing.Size(50, 31);
             this.加载.TabIndex = 35;
@@ -359,12 +462,12 @@ namespace WordMan
             // 
             // 关闭
             // 
-            this.关闭.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(245)))), ((int)(((byte)(247)))));
+            this.关闭.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(70)))), ((int)(((byte)(130)))), ((int)(((byte)(230)))));
             this.关闭.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.关闭.FlatAppearance.BorderSize = 0;
             this.关闭.Font = new System.Drawing.Font("微软雅黑", 10F, System.Drawing.FontStyle.Bold);
-            this.关闭.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(33)))), ((int)(((byte)(37)))), ((int)(((byte)(41)))));
-            this.关闭.Location = new System.Drawing.Point(536, 334);
+            this.关闭.ForeColor = System.Drawing.Color.White;
+            this.关闭.Location = new System.Drawing.Point(536, 380);
             this.关闭.Name = "关闭";
             this.关闭.Size = new System.Drawing.Size(120, 31);
             this.关闭.TabIndex = 34;
@@ -384,16 +487,16 @@ namespace WordMan
             // 
             // Btn_ApplySet
             // 
-            this.Btn_ApplySet.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(70)))), ((int)(((byte)(130)))), ((int)(((byte)(230)))));
+            this.Btn_ApplySet.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(244)))), ((int)(((byte)(67)))), ((int)(((byte)(54)))));
             this.Btn_ApplySet.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.Btn_ApplySet.FlatAppearance.BorderSize = 0;
             this.Btn_ApplySet.Font = new System.Drawing.Font("微软雅黑", 10F, System.Drawing.FontStyle.Bold);
             this.Btn_ApplySet.ForeColor = System.Drawing.Color.White;
-            this.Btn_ApplySet.Location = new System.Drawing.Point(407, 334);
+            this.Btn_ApplySet.Location = new System.Drawing.Point(407, 380);
             this.Btn_ApplySet.Name = "Btn_ApplySet";
             this.Btn_ApplySet.Size = new System.Drawing.Size(120, 31);
             this.Btn_ApplySet.TabIndex = 7;
-            this.Btn_ApplySet.Text = "应用设置";
+            this.Btn_ApplySet.Text = "应用全部";
             this.Btn_ApplySet.UseVisualStyleBackColor = false;
             // 
             // 删除
@@ -404,7 +507,7 @@ namespace WordMan
             this.删除.FlatAppearance.BorderSize = 0;
             this.删除.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.删除.ForeColor = System.Drawing.Color.White;
-            this.删除.Location = new System.Drawing.Point(122, 334);
+            this.删除.Location = new System.Drawing.Point(122, 380);
             this.删除.Name = "删除";
             this.删除.Size = new System.Drawing.Size(50, 31);
             this.删除.TabIndex = 29;
@@ -429,7 +532,7 @@ namespace WordMan
             "7",
             "8",
             "9"});
-            this.显示标题数下拉框.Location = new System.Drawing.Point(535, 274);
+            this.显示标题数下拉框.Location = new System.Drawing.Point(535, 316);
             this.显示标题数下拉框.Name = "显示标题数下拉框";
             this.显示标题数下拉框.Size = new System.Drawing.Size(120, 25);
             this.显示标题数下拉框.TabIndex = 21;
@@ -446,16 +549,16 @@ namespace WordMan
             "论文风格",
             "报告风格",
             "条文风格"});
-            this.风格下拉框.Location = new System.Drawing.Point(278, 274);
+            this.风格下拉框.Location = new System.Drawing.Point(278, 316);
             this.风格下拉框.Name = "风格下拉框";
             this.风格下拉框.Size = new System.Drawing.Size(120, 25);
             this.风格下拉框.TabIndex = 8;
             // 
             // Cmb_ChnFontName
             // 
-            this.Cmb_ChnFontName.AllowInput = false;
+            this.Cmb_ChnFontName.AllowInput = true;
             this.Cmb_ChnFontName.BackColor = System.Drawing.Color.White;
-            this.Cmb_ChnFontName.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.Cmb_ChnFontName.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDown;
             this.Cmb_ChnFontName.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.Cmb_ChnFontName.FormattingEnabled = true;
             this.Cmb_ChnFontName.Location = new System.Drawing.Point(96, 22);
@@ -465,9 +568,9 @@ namespace WordMan
             // 
             // Cmb_EngFontName
             // 
-            this.Cmb_EngFontName.AllowInput = false;
+            this.Cmb_EngFontName.AllowInput = true;
             this.Cmb_EngFontName.BackColor = System.Drawing.Color.White;
-            this.Cmb_EngFontName.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.Cmb_EngFontName.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDown;
             this.Cmb_EngFontName.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.Cmb_EngFontName.FormattingEnabled = true;
             this.Cmb_EngFontName.Location = new System.Drawing.Point(354, 22);
@@ -697,7 +800,7 @@ namespace WordMan
             this.导出.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.导出.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.导出.ForeColor = System.Drawing.Color.White;
-            this.导出.Location = new System.Drawing.Point(348, 334);
+            this.导出.Location = new System.Drawing.Point(348, 380);
             this.导出.Name = "导出";
             this.导出.Size = new System.Drawing.Size(50, 31);
             this.导出.TabIndex = 32;
@@ -712,7 +815,7 @@ namespace WordMan
             this.添加.FlatAppearance.BorderSize = 0;
             this.添加.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.添加.ForeColor = System.Drawing.Color.White;
-            this.添加.Location = new System.Drawing.Point(68, 334);
+            this.添加.Location = new System.Drawing.Point(68, 380);
             this.添加.Name = "添加";
             this.添加.Size = new System.Drawing.Size(50, 31);
             this.添加.TabIndex = 27;
@@ -726,7 +829,7 @@ namespace WordMan
             this.读取文档样式.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.读取文档样式.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
             this.读取文档样式.ForeColor = System.Drawing.Color.White;
-            this.读取文档样式.Location = new System.Drawing.Point(180, 334);
+            this.读取文档样式.Location = new System.Drawing.Point(180, 380);
             this.读取文档样式.Name = "读取文档样式";
             this.读取文档样式.Size = new System.Drawing.Size(90, 31);
             this.读取文档样式.TabIndex = 41;
@@ -739,15 +842,31 @@ namespace WordMan
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(250)))), ((int)(((byte)(252)))));
-            this.ClientSize = new System.Drawing.Size(678, 374);
+            this.ClientSize = new System.Drawing.Size(678, 424);
             this.Controls.Add(this.groupBox3);
+            this.Controls.Add(this.StatusBar);
             this.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-            this.MinimumSize = new System.Drawing.Size(400, 300);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
+            this.MinimumSize = new System.Drawing.Size(400, 460);
             this.Name = "StyleSettings";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "样式设置";
+            // 
+            // StatusBar
+            // 
+            this.StatusBar.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.statusLabel});
+            this.StatusBar.Location = new System.Drawing.Point(0, 401);
+            this.StatusBar.Name = "StatusBar";
+            this.StatusBar.Size = new System.Drawing.Size(678, 23);
+            this.StatusBar.TabIndex = 44;
+            // 
+            // statusLabel
+            // 
+            this.statusLabel.Name = "statusLabel";
+            this.statusLabel.Size = new System.Drawing.Size(520, 17);
+            this.statusLabel.Text = "就绪";
             this.groupBox3.ResumeLayout(false);
             this.groupBox3.PerformLayout();
             this.Pal_Font.ResumeLayout(false);

@@ -473,8 +473,11 @@ namespace WordMan
                         break;
                 }
 
-                // 对当前段落应用样式
-                selection.Paragraphs.set_Style(styleId);
+                // 对当前段落应用样式（封装为一个可撤销步骤，支持 Ctrl+Z）
+                Globals.ThisAddIn.ExecuteWithUndoRecord($"应用{level}级标题样式", () =>
+                {
+                    selection.Paragraphs.set_Style(styleId);
+                });
 
                 // 恢复光标位置
                 selection.SetRange(cursorRange.Start, cursorRange.Start);
@@ -505,18 +508,21 @@ namespace WordMan
                 // 保存当前光标位置
                 Range cursorRange = selection.Range;
 
-                // 对当前段落应用样式
-                selection.Paragraphs.set_Style(WdBuiltinStyle.wdStyleNormal);
+                // 对当前段落应用样式（封装为一个可撤销步骤，支持 Ctrl+Z）
+                Globals.ThisAddIn.ExecuteWithUndoRecord(useIndent ? "应用正文（缩进）样式" : "应用正文样式", () =>
+                {
+                    selection.Paragraphs.set_Style(WdBuiltinStyle.wdStyleNormal);
 
-                // 如果使用缩进，设置首行缩进两个字符
-                if (useIndent)
-                {
-                    selection.ParagraphFormat.FirstLineIndent = 24f; // 2个字符的缩进（12pt字体对应24pt缩进）
-                }
-                else
-                {
-                    selection.ParagraphFormat.FirstLineIndent = 0f;
-                }
+                    // 如果使用缩进，设置首行缩进两个字符
+                    if (useIndent)
+                    {
+                        selection.ParagraphFormat.FirstLineIndent = 24f; // 2个字符的缩进（12pt字体对应24pt缩进）
+                    }
+                    else
+                    {
+                        selection.ParagraphFormat.FirstLineIndent = 0f;
+                    }
+                });
 
                 // 恢复光标位置
                 selection.SetRange(cursorRange.Start, cursorRange.Start);
@@ -549,30 +555,34 @@ namespace WordMan
 
                 const string tableTextStyleName = "表中文本";
 
-                // 检查是否已存在"表中文本"样式
-                Style tableTextStyle = null;
-                bool styleExists = false;
-
-                foreach (Style s in activeDoc.Styles)
+                // 应用样式（封装为一个可撤销步骤，支持 Ctrl+Z）
+                Globals.ThisAddIn.ExecuteWithUndoRecord("应用表中文本样式", () =>
                 {
-                    if (s.NameLocal == tableTextStyleName)
+                    // 检查是否已存在"表中文本"样式
+                    Style tableTextStyle = null;
+                    bool styleExists = false;
+
+                    foreach (Style s in activeDoc.Styles)
                     {
-                        tableTextStyle = s;
-                        styleExists = true;
-                        break;
+                        if (s.NameLocal == tableTextStyleName)
+                        {
+                            tableTextStyle = s;
+                            styleExists = true;
+                            break;
+                        }
                     }
-                }
 
-                // 如果不存在则创建新样式，基于正文样式
-                if (!styleExists)
-                {
-                    tableTextStyle = activeDoc.Styles.Add(tableTextStyleName, WdStyleType.wdStyleTypeParagraph);
-                    object baseStyle = activeDoc.Styles[WdBuiltinStyle.wdStyleNormal];
-                    tableTextStyle.set_BaseStyle(ref baseStyle);
-                }
+                    // 如果不存在则创建新样式，基于正文样式
+                    if (!styleExists)
+                    {
+                        tableTextStyle = activeDoc.Styles.Add(tableTextStyleName, WdStyleType.wdStyleTypeParagraph);
+                        object baseStyle = activeDoc.Styles[WdBuiltinStyle.wdStyleNormal];
+                        tableTextStyle.set_BaseStyle(ref baseStyle);
+                    }
 
-                // 对当前段落应用样式
-                selection.Paragraphs.set_Style(tableTextStyle);
+                    // 对当前段落应用样式
+                    selection.Paragraphs.set_Style(tableTextStyle);
+                });
 
                 // 恢复光标位置
                 selection.SetRange(cursorRange.Start, cursorRange.Start);
@@ -603,8 +613,11 @@ namespace WordMan
                 // 保存当前光标位置
                 Range cursorRange = selection.Range;
 
-                // 对当前段落应用样式
-                selection.Paragraphs.set_Style(WdBuiltinStyle.wdStyleCaption);
+                // 对当前段落应用样式（封装为一个可撤销步骤，支持 Ctrl+Z）
+                Globals.ThisAddIn.ExecuteWithUndoRecord("应用题注样式", () =>
+                {
+                    selection.Paragraphs.set_Style(WdBuiltinStyle.wdStyleCaption);
+                });
 
                 // 恢复光标位置
                 selection.SetRange(cursorRange.Start, cursorRange.Start);

@@ -404,7 +404,15 @@ namespace WordMan
         #region 全文处理组
         private void TypesettingButton_Click(object sender, RibbonControlEventArgs e)
         {
-            TypesettingTaskPane.TriggerShowOrHide();
+            try
+            {
+                // 由 ThisAddIn 管理：每个 Word 窗口各自的侧边窗格，切换窗口时跟随显示
+                Globals.ThisAddIn.ToggleTypesettingPane();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开排版工具失败：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void 样式设置_Click(object sender, RibbonControlEventArgs e)

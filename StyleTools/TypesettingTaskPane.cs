@@ -13,9 +13,6 @@ namespace WordMan
 {
     public partial class TypesettingTaskPane : UserControl
     {
-        // 静态变量：存储唯一的任务窗格实例
-        private static Microsoft.Office.Tools.CustomTaskPane _uniqueTaskPane;
-
         // 动态标题数量配置（默认显示6个标题）
         private static int _maxHeadingLevels = 6;
         
@@ -26,7 +23,6 @@ namespace WordMan
         private const int BUTTON_HEIGHT = 44;
         private const int LABEL_HEIGHT = 40;
         private const int SECTION_MARGIN = 20;
-        private const int TASK_PANE_WIDTH = 200;
         private const int TITLE_LABEL_WIDTH = 80;
         private const int COMBO_WIDTH = 30;
         private const int COMBO_SPACING = 6;
@@ -675,12 +671,17 @@ namespace WordMan
             }
         }
 
-        // 关闭任务窗格
+        // 关闭任务窗格（隐藏当前窗口的排版窗格）
         private void CloseTaskPane()
         {
-            if (_uniqueTaskPane != null)
+            try
             {
-                _uniqueTaskPane.Visible = false;
+                Globals.ThisAddIn.HideActiveTypesettingPane();
+            }
+            catch
+            {
+                // 隐藏失败时直接隐藏控件自身
+                this.Visible = false;
             }
         }
 
@@ -847,23 +848,6 @@ namespace WordMan
         public static bool GetMessageTipsEnabled()
         {
             return _enableMessageTips;
-        }
-
-        // 对外暴露的静态方法：供Ribbon调用
-        public static void TriggerShowOrHide()
-        {
-            if (_uniqueTaskPane == null)
-            {
-                _uniqueTaskPane = Globals.ThisAddIn.CustomTaskPanes.Add(
-                  control: new TypesettingTaskPane(),
-                  title: "排版工具"
-                );
-
-                _uniqueTaskPane.DockPosition = MsoCTPDockPosition.msoCTPDockPositionRight;
-                _uniqueTaskPane.Width = TASK_PANE_WIDTH;
-            }
-
-            _uniqueTaskPane.Visible = !_uniqueTaskPane.Visible;
         }
     }
 }

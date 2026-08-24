@@ -1,0 +1,86 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "F:\\02_Program\\c_sharp\\Git\\WordMan_VSTO\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7DF77B8D-BA24-4C23-8505-B8FA6F2433E5}|WordMan.csproj|f:\\02_program\\c_sharp\\git\\wordman_vsto\\mainribbon.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{7DF77B8D-BA24-4C23-8505-B8FA6F2433E5}|WordMan.csproj|solutionrelative:mainribbon.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 297,
+          "SelectedChildIndex": 7,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{32a6260a-0121-4878-95e5-80d2f08ea4cb}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{8e5c1d1a-8a91-4406-aa56-5bf27c97d63c}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "RST:0:0:{6829fd6e-5b5f-70fa-39ba-09fec3485802}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainRibbon.cs [\u8BBE\u8BA1]",
+              "DocumentMoniker": "F:\\02_Program\\c_sharp\\Git\\WordMan_VSTO\\MainRibbon.cs",
+              "RelativeDocumentMoniker": "MainRibbon.cs",
+              "ToolTip": "F:\\02_Program\\c_sharp\\Git\\WordMan_VSTO\\MainRibbon.cs [\u8BBE\u8BA1]",
+              "RelativeToolTip": "MainRibbon.cs [\u8BBE\u8BA1]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-24T01:40:11.798Z",
+              "EditorCaption": " [\u8BBE\u8BA1]"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 883,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e1b7d1f8-9b3c-49b1-8f4f-bfc63a88835d}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e5c86464-96be-4d7c-9a8b-abcb3bbf5f92}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

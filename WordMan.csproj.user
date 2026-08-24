@@ -5,4 +5,8 @@
     <InstallUrlHistory />
     <SupportUrlHistory />
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <StartAction>Program</StartAction>
+    <StartProgram>C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE</StartProgram>
+  </PropertyGroup>
 </Project>

@@ -29,9 +29,15 @@ echo ============================================================
 echo  WordMan build started: Debug + Release
 echo ============================================================
 
+
+
 set "FAILED=0"
 
 for %%C in (Debug Release) do (
+    echo.
+    echo ---------- Cleaning %%C ----------
+    "%MSBUILD%" "%~dp0WordMan.csproj" -p:Configuration=%%C -t:Clean -v:minimal -nologo
+
     echo.
     echo ---------- Building %%C ----------
     "%MSBUILD%" "%~dp0WordMan.csproj" -p:Configuration=%%C -t:Build -v:minimal -nologo

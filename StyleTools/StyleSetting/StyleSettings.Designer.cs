@@ -580,9 +580,9 @@ namespace WordMan
             // 
             // Cmb_FontSize
             // 
-            this.Cmb_FontSize.AllowInput = false;
+            this.Cmb_FontSize.AllowInput = true;
             this.Cmb_FontSize.BackColor = System.Drawing.Color.White;
-            this.Cmb_FontSize.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.Cmb_FontSize.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDown;
             this.Cmb_FontSize.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.Cmb_FontSize.FormattingEnabled = true;
             this.Cmb_FontSize.Location = new System.Drawing.Point(96, 57);

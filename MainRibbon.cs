@@ -1,6 +1,5 @@
 ﻿using Microsoft.Office.Tools.Ribbon;
 using System;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Word = Microsoft.Office.Interop.Word;
 using WordMan.SplitAndMerge;
@@ -424,28 +423,21 @@ namespace WordMan
                 {
                     styleSettingsForm = new StyleSettings();
                     styleSettingsForm.FormClosed += (s, args) => styleSettingsForm = null;
-                    styleSettingsForm.Show();
-
-                    // 设置 Word 主窗口为所有者，使窗口始终置于 Word 上方
+                    // 在显示前通过 WinForms 建立所属关系，嵌套模态窗口关闭时才能正确恢复激活。
+                    IntPtr wordHwnd = IntPtr.Zero;
                     try
                     {
-                        var wordHwnd = new IntPtr(Globals.ThisAddIn.Application.ActiveWindow?.Hwnd ?? 0);
-                        if (wordHwnd != IntPtr.Zero && styleSettingsForm.IsHandleCreated)
-                        {
-                            if (IntPtr.Size == 8)
-                            {
-                                NativeMethods.SetWindowLongPtr64(styleSettingsForm.Handle, NativeMethods.GWL_HWNDPARENT, wordHwnd);
-                            }
-                            else
-                            {
-                                NativeMethods.SetWindowLong32(styleSettingsForm.Handle, NativeMethods.GWL_HWNDPARENT, wordHwnd.ToInt32());
-                            }
-                        }
+                        wordHwnd = new IntPtr(Globals.ThisAddIn.Application.ActiveWindow?.Hwnd ?? 0);
                     }
                     catch
                     {
-                        // 设置所有者失败不影响窗口使用
+                        // Word 没有活动窗口时仍允许打开样式设置。
                     }
+                    styleSettingsForm.ShowInTaskbar = false;
+                    if (wordHwnd != IntPtr.Zero)
+                        styleSettingsForm.Show(new WordWindowOwner(wordHwnd));
+                    else
+                        styleSettingsForm.Show();
                 }
                 else
                 {
@@ -458,7 +450,7 @@ namespace WordMan
                     styleSettingsForm.BringToFront();
                     try
                     {
-                        styleSettingsForm.RefreshFromDocument();
+                        styleSettingsForm.RefreshFromDocument(onlyIfDocumentChanged: true);
                     }
                     catch
                     {
@@ -476,12 +468,25 @@ namespace WordMan
         {
             try
             {
-                // 如果表单已存在但已关闭，重新创建
+                // 非模态单实例：显示前建立 Word 所属关系，重复点击保留正在编辑的设置。
                 if (multiLevelListForm == null || multiLevelListForm.IsDisposed)
                 {
                     multiLevelListForm = new MultiLevelListForm();
+                    multiLevelListForm.FormClosed += (s, args) => multiLevelListForm = null;
+                    var wordHwnd = new IntPtr(Globals.ThisAddIn.Application.ActiveWindow?.Hwnd ?? 0);
+                    multiLevelListForm.ShowInTaskbar = false;
+                    if (wordHwnd != IntPtr.Zero)
+                        multiLevelListForm.Show(new WordWindowOwner(wordHwnd));
+                    else
+                        multiLevelListForm.Show();
                 }
-                multiLevelListForm.ShowDialog();
+                else
+                {
+                    if (multiLevelListForm.WindowState == FormWindowState.Minimized)
+                        multiLevelListForm.WindowState = FormWindowState.Normal;
+                    multiLevelListForm.Activate();
+                    multiLevelListForm.BringToFront();
+                }
             }
             catch (Exception ex)
             {
@@ -591,19 +596,15 @@ namespace WordMan
     }
 
     /// <summary>
-    /// Win32 原生方法辅助类（用于将样式设置窗口绑定到 Word 主窗口，使其始终置于 Word 上方）
+    /// 将 Word 的原生窗口句柄交给 WinForms 管理窗口所属关系。
     /// </summary>
-    internal static class NativeMethods
+    internal sealed class WordWindowOwner : IWin32Window
     {
-        /// <summary>
-        /// GWL_HWNDPARENT - 设置窗口的所有者窗口
-        /// </summary>
-        public const int GWL_HWNDPARENT = -8;
+        public WordWindowOwner(IntPtr handle)
+        {
+            Handle = handle;
+        }
 
-        [DllImport("user32.dll", EntryPoint = "SetWindowLong", CharSet = CharSet.Auto)]
-        public static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
-
-        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", CharSet = CharSet.Auto)]
-        public static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        public IntPtr Handle { get; private set; }
     }
 }

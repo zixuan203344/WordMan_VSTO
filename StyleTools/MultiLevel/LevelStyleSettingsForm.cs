@@ -25,7 +25,7 @@ namespace WordMan.MultiLevel
         /// </summary>
         public List<WordStyleInfo> GetLevelStyles()
         {
-            return LevelStyles;
+            return LevelStyles.Select(x => x.Clone()).ToList();
         }
 
         /// <summary>
@@ -33,49 +33,58 @@ namespace WordMan.MultiLevel
         /// </summary>
         public void LoadExistingStyles(List<WordStyleInfo> existingStyles)
         {
-            if (existingStyles == null || existingStyles.Count == 0)
-                return;
-
-            // 清空现有样式
-            LevelStyles.Clear();
-            
-            // 加载现有样式
-            LevelStyles.AddRange(existingStyles);
-            
-            // 重新绑定数据源
-            if (Dta_StyleList != null)
+            if (existingStyles == null) return;
+            userChange = false;
+            try
             {
+                // 对副本编辑，取消或右上角关闭时不改动父窗口的待应用设置。
+                for (int i = 0; i < LevelStyles.Count && i < existingStyles.Count; i++)
+                    if (existingStyles[i] != null) LevelStyles[i] = existingStyles[i].Clone();
                 Dta_StyleList.DataSource = null;
                 Dta_StyleList.DataSource = LevelStyles;
+                if (LevelStyles.Count > 0) SetValueByStyle(LevelStyles[0]);
             }
+            finally { userChange = true; }
         }
 
         public LevelStyleSettingsForm(int maxLevel = 9)
         {
+            if (maxLevel < 1 || maxLevel > 9) throw new ArgumentOutOfRangeException("maxLevel");
             this.maxLevel = maxLevel;
             InitializeComponent();
+            ShowInTaskbar = false;
+            AcceptButton = Btn_SetStyles;
+            CancelButton = Btn_Cancel;
+            Btn_Cancel.DialogResult = DialogResult.Cancel;
+            Btn_Cancel.CausesValidation = false;
+            Txt_LeftIndent.DecimalPlaces = 3;
+            Txt_RightIndent.DecimalPlaces = 3;
+            Txt_LeftIndent.Minimum = Txt_RightIndent.Minimum = -1000000m;
+            Txt_LeftIndent.Maximum = Txt_RightIndent.Maximum = 1000000m;
+            Cmb_Alignment.AllowInput = false;
             InitializeForm();
         }
 
         private void InitializeForm()
         {
             userChange = false;
-            
+
             // 获取系统字体
             LoadSystemFonts();
-            
+
             // 初始化级别样式（只有在没有现有样式时才初始化）
             if (LevelStyles.Count == 0)
             {
                 InitializeLevelStyles();
             }
-            
+
             // 初始化控件
             InitializeControls();
-            
+
             // 初始化事件处理
             InitializeEventHandlers();
-            
+
+            if (LevelStyles.Count > 0) SetValueByStyle(LevelStyles[0]);
             userChange = true;
         }
 
@@ -86,8 +95,8 @@ namespace WordMan.MultiLevel
         /// </summary>
         private void LoadSystemFonts()
         {
-            var installedFontCollection = new InstalledFontCollection();
-            FontNames.AddRange(installedFontCollection.Families.Select(fontFamily => fontFamily.Name));
+            using (var fonts = new InstalledFontCollection())
+                FontNames.AddRange(fonts.Families.Select(family => family.Name));
         }
 
         /// <summary>
@@ -108,7 +117,7 @@ namespace WordMan.MultiLevel
             {
                 int columnIndex = Dta_StyleList.Columns[columnName].Index;
                 Dta_StyleList.UpdateCellValue(columnIndex, rowIndex);
-                
+
                 // 对于颜色列，需要强制刷新显示
                 if (columnName == "Col_FontColor")
                 {
@@ -122,16 +131,11 @@ namespace WordMan.MultiLevel
         /// </summary>
         private void SetComboBoxSelection(StandardComboBox comboBox, string value, IEnumerable<string> items)
         {
-            var itemList = items.ToList();
-            int selectedIndex = itemList.IndexOf(value);
-            if (selectedIndex != -1)
-            {
-                comboBox.SelectedIndex = selectedIndex;
-            }
-            else
-            {
-                comboBox.Text = value;
-            }
+            int index = comboBox.Items.IndexOf(value ?? "");
+            if (index < 0 && !string.IsNullOrEmpty(value) && comboBox.DropDownStyle == ComboBoxStyle.DropDownList)
+                index = comboBox.Items.Add(value);
+            comboBox.SelectedIndex = index;
+            if (index < 0) comboBox.Text = value ?? "";
         }
 
         /// <summary>
@@ -139,91 +143,35 @@ namespace WordMan.MultiLevel
         /// </summary>
         private void ValidateAndFormatText(Control control, string unit)
         {
-            if (control is StandardComboBox comboBox && comboBox.SelectedIndex != -1) return;
-            
-            var text = control.Text.Trim();
-            
-            // 处理行距的特殊情况
-            if (control.Name == "Cmb_LineSpacing")
+            // 只格式化已验证的值，不能将非法输入静默替换为默认值。
+            string text = control.Text.Trim();
+            if (control == Cmb_FontSize)
             {
-                // 如果已经是有效的行距格式，不进行修改
-                if (IsValidLineSpacing(text))
-                {
-                    return;
-                }
-                
-                // 尝试解析倍行距格式
-                if (text.EndsWith("倍行距"))
-                {
-                    var valueText = text.Replace("倍行距", "").Trim();
-                    if (float.TryParse(valueText, out float multipleValue))
-                    {
-                        control.Text = $"{multipleValue:0.0} 倍行距";
-                        return;
-                    }
-                }
-                
-                // 尝试解析磅格式
-                if (text.EndsWith("磅"))
-                {
-                    var valueText = text.Replace("磅", "").Trim();
-                    if (float.TryParse(valueText, out float pointValue))
-                    {
-                        control.Text = $"{pointValue:0.0} 磅";
-                        return;
-                    }
-                }
-                
-                // 默认设置为单倍行距
-                control.Text = "单倍行距";
-                return;
+                float size;
+                if (!MultiLevelDataManager.TryParseFontSize(text, out size)) return;
+                if (!text.Contains("号")) control.Text = size.ToString("0.##") + " 磅";
             }
-            
-            // 其他控件的处理
-            var cleanText = text.TrimEnd(' ', '磅', '厘', '米', '行');
-            if (float.TryParse(cleanText, out float value))
+            else if (control == Cmb_LineSpacing)
             {
-                control.Text = $"{value:0.0} {unit}";
+                if (!WordStyleInfo.IsValidLineSpacing(text)) return;
+                control.Text = text;
             }
             else
             {
-                // 设置默认值
-                if (control is StandardComboBox cb) cb.SelectedIndex = 0;
-                else control.Text = $"0.0 {unit}";
+                float value;
+                string suffix = text.EndsWith("行", StringComparison.Ordinal) ? "行" : "磅";
+                if (float.TryParse(text.Replace("行", "").Replace("磅", "").Trim(), out value) &&
+                    !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0 && value <= 1584)
+                    control.Text = value.ToString("0.###") + " " + suffix;
             }
         }
-        
+
         /// <summary>
         /// 检查是否为有效的行距格式
         /// </summary>
         private bool IsValidLineSpacing(string text)
         {
-            var validFormats = new[]
-            {
-                "单倍行距", "1.5倍行距", "双倍行距", "多倍行距"
-            };
-            
-            // 检查预定义格式
-            if (validFormats.Contains(text))
-            {
-                return true;
-            }
-            
-            // 检查自定义倍行距格式 (如 "2.2 倍行距")
-            if (text.EndsWith("倍行距"))
-            {
-                var valueText = text.Replace("倍行距", "").Trim();
-                return float.TryParse(valueText, out float value) && value > 0;
-            }
-            
-            // 检查磅格式 (如 "12.0 磅")
-            if (text.EndsWith("磅"))
-            {
-                var valueText = text.Replace("磅", "").Trim();
-                return float.TryParse(valueText, out float value) && value > 0;
-            }
-            
-            return false;
+            return WordStyleInfo.IsValidLineSpacing(text);
         }
 
         /// <summary>
@@ -237,15 +185,8 @@ namespace WordMan.MultiLevel
                 return textBox.Text;
             if (control is StandardNumericUpDown numericUpDown)
             {
-                // 根据控件名称确定单位
-                if (control.Name == "Txt_LeftIndent" || control.Name == "Txt_RightIndent")
-                {
-                    return $"{numericUpDown.GetValueInUnit("字符"):0.0} 字符";
-                }
-                else
-                {
-                    return $"{numericUpDown.GetValueInCentimeters():0.0} 厘米";
-                }
+                // 使用磅保存物理缩进，避免字符换算与 Word 写入不一致。
+                return numericUpDown.GetValueInUnit("磅").ToString("0.###") + " 磅";
             }
             if (control is ToggleButton toggleButton)
                 return toggleButton.Pressed;
@@ -307,16 +248,16 @@ namespace WordMan.MultiLevel
         {
             // 设置窗体字体
             this.Font = new Font("Microsoft YaHei", 9F, FontStyle.Regular);
-            
+
             // 设置GroupBox字体
             Grp_SetSelectedStyle.Font = new Font("Microsoft YaHei", 10F, FontStyle.Bold);
             Grp_SetSelectedStyle.ForeColor = Color.FromArgb(51, 51, 51);
-            
+
             // 设置DataGridView字体
             Dta_StyleList.Font = new Font("Microsoft YaHei", 9F);
             Dta_StyleList.ColumnHeadersDefaultCellStyle.Font = new Font("Microsoft YaHei", 9F, FontStyle.Bold);
             Dta_StyleList.DefaultCellStyle.Font = new Font("Microsoft YaHei", 9F);
-            
+
             // 设置所有标签字体
             SetControlFont(label1, 9F, FontStyle.Bold);
             SetControlFont(label2, 9F, FontStyle.Bold);
@@ -332,7 +273,7 @@ namespace WordMan.MultiLevel
             SetControlFont(label12, 9F, FontStyle.Bold);
             SetControlFont(label13, 9F, FontStyle.Bold);
             SetControlFont(label14, 9F, FontStyle.Bold);
-            
+
             // 设置所有下拉框字体
             SetControlFont(Cmb_ChnFontName, 9F);
             SetControlFont(Cmb_EngFontName, 9F);
@@ -341,11 +282,11 @@ namespace WordMan.MultiLevel
             SetControlFont(Cmb_LineSpacing, 9F);
             SetControlFont(Cmb_SpaceBefore, 9F);
             SetControlFont(Cmb_SpaceAfter, 9F);
-            
+
             // 设置所有数值输入框字体
             SetControlFont(Txt_LeftIndent, 9F);
             SetControlFont(Txt_RightIndent, 9F);
-            
+
             // 设置所有按钮字体
             SetControlFont(Btn_FontColor, 9F, FontStyle.Bold);
             SetControlFont(Btn_Bold, 8F, FontStyle.Bold);
@@ -379,24 +320,24 @@ namespace WordMan.MultiLevel
                 };
 
                 var styles = Globals.ThisAddIn.Application.ActiveDocument.Styles;
-                
+
                 for (int i = 0; i < maxLevel && i < headingStyles.Length; i++)
                 {
                     object index = headingStyles[i];
                     Style style = styles[ref index];
-                    
+
                     // 创建样式对象，从Word文档样式读取所有属性包括颜色
                     var wordStyleInfo = new WordStyleInfo(style, headingStyles[i]);
-                    
+
                     // 注释掉强制设置黑色，让颜色从文档样式自动读取
                     // wordStyleInfo.FontColor = Color.Black;
-                    
+
                     LevelStyles.Add(wordStyleInfo);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"初始化级别样式失败：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                throw new InvalidOperationException("初始化级别样式失败：" + ex.Message, ex);
             }
         }
 
@@ -404,10 +345,10 @@ namespace WordMan.MultiLevel
         {
             // 初始化DataGridView
             InitializeDataGridView();
-            
+
             // 设置所有控件字体为微软雅黑
             SetAllControlsFont();
-            
+
             // 使用通用方法初始化下拉框
             InitializeComboBox(Cmb_ChnFontName, FontNames);
             InitializeComboBox(Cmb_EngFontName, FontNames);
@@ -424,30 +365,30 @@ namespace WordMan.MultiLevel
         private void InitializeEventHandlers()
         {
             // 字体相关控件
-            Cmb_ChnFontName.SelectedIndexChanged += (s, e) => OnControlValueChanged(s, "ChnFontName", "Col_ChnFontName");
-            Cmb_EngFontName.SelectedIndexChanged += (s, e) => OnControlValueChanged(s, "EngFontName", "Col_EngFontName");
+            Cmb_ChnFontName.TextChanged += (s, e) => OnControlValueChanged(s, "ChnFontName", "Col_ChnFontName");
+            Cmb_EngFontName.TextChanged += (s, e) => OnControlValueChanged(s, "EngFontName", "Col_EngFontName");
             Cmb_FontSize.TextChanged += (s, e) => OnControlValueChanged(s, "FontSize", "Col_FontSize");
-            
+
             // 格式相关控件
             Btn_Bold.PressedChanged += (s, e) => OnControlValueChanged(s, "Bold", "Col_FontBold");
             Btn_Italic.PressedChanged += (s, e) => OnControlValueChanged(s, "Italic", "Col_FontItalic");
             Btn_Underline.PressedChanged += (s, e) => OnControlValueChanged(s, "Underline", "Col_FontUnderline");
-            
+
             // 缩进相关控件
             Txt_LeftIndent.ValueChanged += (s, e) => OnControlValueChanged(s, "LeftIndent", "Col_LeftIndent");
             Txt_RightIndent.ValueChanged += (s, e) => OnControlValueChanged(s, "RightIndent", "Col_RightIndent");
-            
+
             // 间距相关控件
             Cmb_LineSpacing.TextChanged += (s, e) => OnControlValueChanged(s, "LineSpace", "Col_LineSpace");
             Cmb_SpaceBefore.TextChanged += (s, e) => OnControlValueChanged(s, "SpaceBefore", "Col_SpaceBefore");
             Cmb_SpaceAfter.TextChanged += (s, e) => OnControlValueChanged(s, "SpaceAfter", "Col_SpaceAfter");
-            
+
             // 对齐相关控件
             Cmb_Alignment.SelectedIndexChanged += (s, e) => OnControlValueChanged(s, "HAlignment", "Col_HAlignment");
-            
+
             // 分页相关控件
             Btn_BreakBefore.PressedChanged += (s, e) => OnControlValueChanged(s, "BreakBefore", "Col_BreakBefore");
-            
+
             // 颜色控件
             Btn_FontColor.BackColorChanged += (s, e) => OnControlValueChanged(s, "FontColor", "Col_FontColor");
         }
@@ -458,19 +399,34 @@ namespace WordMan.MultiLevel
         private void OnControlValueChanged(object sender, string propertyName, string columnName)
         {
             if (!userChange || Dta_StyleList.SelectedRows.Count <= 0) return;
-
-            foreach (DataGridViewRow selectedRow in Dta_StyleList.SelectedRows)
+            var sourceControl = sender as Control;
+            object value = GetControlValue(sourceControl);
+            if (value == null) return;
+            string text = value as string;
+            float parsed;
+            if (propertyName == "FontSize" && !MultiLevelDataManager.TryParseFontSize(text, out parsed)) return;
+            if (propertyName == "LineSpace" && !WordStyleInfo.IsValidLineSpacing(text)) return;
+            if (propertyName == "SpaceBefore" || propertyName == "SpaceAfter")
             {
-                var style = LevelStyles[selectedRow.Index];
-                var control = sender as Control;
-                
+                string suffix = (text ?? "").Trim().EndsWith("行", StringComparison.Ordinal) ? "行" : "磅";
+                if (!float.TryParse((text ?? "").Replace("行", "").Replace("磅", "").Trim(), out parsed) ||
+                    float.IsNaN(parsed) || float.IsInfinity(parsed) || parsed < 0 || parsed > 1584) return;
+                value = parsed.ToString("0.###") + " " + suffix;
+            }
+
+            foreach (DataGridViewRow selectedRow in Dta_StyleList.SelectedRows.Cast<DataGridViewRow>().ToArray())
+            {
+                var style = selectedRow.DataBoundItem as WordStyleInfo;
+                if (style == null) continue;
+
                 // 使用反射设置属性值
                 var property = typeof(WordStyleInfo).GetProperty(propertyName);
                 if (property != null)
                 {
-                    var newValue = GetControlValue(control);
-                    property.SetValue(style, newValue, null);
-                    
+                    property.SetValue(style, value, null);
+                    if (propertyName == "Underline")
+                        style.UnderlineStyle = style.Underline ? (int)WdUnderline.wdUnderlineSingle : 0;
+
                     // 对于颜色属性，确保数据绑定正确更新
                     if (propertyName == "FontColor")
                     {
@@ -489,15 +445,17 @@ namespace WordMan.MultiLevel
         {
             Dta_StyleList.Columns.Clear();
             Dta_StyleList.ReadOnly = true;
+            Dta_StyleList.AllowUserToAddRows = false;
+            Dta_StyleList.AllowUserToDeleteRows = false;
             Dta_StyleList.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             Dta_StyleList.AutoGenerateColumns = false;
-            
+
             // 设置默认单元格样式为居中
             var centerAlignment = new DataGridViewCellStyle
             {
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
-            
+
             // 添加列
             Dta_StyleList.Columns.AddRange(new DataGridViewColumn[]
             {
@@ -535,12 +493,11 @@ namespace WordMan.MultiLevel
                     Width = 90,
                     DefaultCellStyle = centerAlignment
                 },
-                new DataGridViewImageColumn
+                new DataGridViewTextBoxColumn
                 {
                     Name = "Col_FontColor",
                     DataPropertyName = "FontColor",
                     HeaderText = "颜色",
-                    ImageLayout = DataGridViewImageCellLayout.Normal,
                     Width = 50,
                     DefaultCellStyle = centerAlignment
                 },
@@ -633,7 +590,7 @@ namespace WordMan.MultiLevel
                     DefaultCellStyle = centerAlignment
                 }
             });
-            
+
             Dta_StyleList.DataSource = LevelStyles;
             Dta_StyleList.CellFormatting += Dta_StyleList_CellFormatting;
             Dta_StyleList.SelectionChanged += Dta_StyleList_SelectionChanged;
@@ -641,51 +598,51 @@ namespace WordMan.MultiLevel
 
         private void Dta_StyleList_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (e.ColumnIndex != Dta_StyleList.Columns["Col_FontColor"].Index || e.RowIndex < 0 || !(Dta_StyleList.Rows[e.RowIndex].DataBoundItem is WordStyleInfo wordStyleInfo))
-            {
-                return;
-            }
-            using (Bitmap bitmap = new Bitmap(16, 16))
-            using (Graphics graphics = Graphics.FromImage(bitmap))
-            {
-                graphics.Clear(wordStyleInfo.FontColor);
-                e.Value = new Bitmap(bitmap);
-            }
+            if (e.ColumnIndex != Dta_StyleList.Columns["Col_FontColor"].Index || e.RowIndex < 0) return;
+            var style = Dta_StyleList.Rows[e.RowIndex].DataBoundItem as WordStyleInfo;
+            if (style == null) return;
+            e.Value = "";
+            e.CellStyle.BackColor = style.FontColor;
+            e.CellStyle.SelectionBackColor = style.FontColor;
+            e.FormattingApplied = true;
         }
 
         private void Dta_StyleList_SelectionChanged(object sender, EventArgs e)
         {
-            if (Dta_StyleList.SelectedRows.Count > 0)
-            {
-                SetValueByStyle(LevelStyles[Dta_StyleList.SelectedRows[0].Index]);
-            }
+            if (userChange && Dta_StyleList.SelectedRows.Count > 0 &&
+                Dta_StyleList.SelectedRows[0].DataBoundItem is WordStyleInfo selectedStyle)
+                SetValueByStyle(selectedStyle);
         }
 
         private void SetValueByStyle(WordStyleInfo style)
         {
+            bool previousUserChange = userChange;
             userChange = false;
-            
-            // 使用通用方法设置控件值
-            SetComboBoxSelection(Cmb_ChnFontName, style.ChnFontName, FontNames);
-            SetComboBoxSelection(Cmb_EngFontName, style.EngFontName, FontNames);
-            SetComboBoxSelection(Cmb_FontSize, style.FontSize, WordStyleInfo.FontSizes);
-            SetComboBoxSelection(Cmb_LineSpacing, style.LineSpace, WordStyleInfo.LineSpacings);
-            SetComboBoxSelection(Cmb_SpaceBefore, style.SpaceBefore, WordStyleInfo.SpaceBeforeValues);
-            SetComboBoxSelection(Cmb_SpaceAfter, style.SpaceAfter, WordStyleInfo.SpaceAfterValues);
-            SetComboBoxSelection(Cmb_Alignment, style.HAlignment, WordStyleInfo.HAlignments);
-            
-            // 设置其他控件
-            Btn_FontColor.BackColor = style.FontColor;
-            Btn_Bold.Pressed = style.Bold;
-            Btn_Italic.Pressed = style.Italic;
-            Btn_Underline.Pressed = style.Underline;
-            Btn_BreakBefore.Pressed = style.BreakBefore;
-            
-            // 设置缩进控件（从字符串解析数值）
-            SetIndentValue(Txt_LeftIndent, style.LeftIndent);
-            SetIndentValue(Txt_RightIndent, style.RightIndent);
-            
-            userChange = true;
+            try
+            {
+
+                // 使用通用方法设置控件值
+                SetComboBoxSelection(Cmb_ChnFontName, style.ChnFontName, FontNames);
+                SetComboBoxSelection(Cmb_EngFontName, style.EngFontName, FontNames);
+                SetComboBoxSelection(Cmb_FontSize, style.FontSize, WordStyleInfo.FontSizes);
+                SetComboBoxSelection(Cmb_LineSpacing, style.LineSpace, WordStyleInfo.LineSpacings);
+                SetComboBoxSelection(Cmb_SpaceBefore, style.SpaceBefore, WordStyleInfo.SpaceBeforeValues);
+                SetComboBoxSelection(Cmb_SpaceAfter, style.SpaceAfter, WordStyleInfo.SpaceAfterValues);
+                SetComboBoxSelection(Cmb_Alignment, style.HAlignment, WordStyleInfo.HAlignments);
+
+                // 设置其他控件
+                Btn_FontColor.BackColor = style.FontColor;
+                Btn_Bold.Pressed = style.Bold;
+                Btn_Italic.Pressed = style.Italic;
+                Btn_Underline.Pressed = style.Underline;
+                Btn_BreakBefore.Pressed = style.BreakBefore;
+
+                // 设置缩进控件（从字符串解析数值）
+                SetIndentValue(Txt_LeftIndent, style.LeftIndent);
+                SetIndentValue(Txt_RightIndent, style.RightIndent);
+
+            }
+            finally { userChange = previousUserChange; }
         }
 
         private void ToggleButton_PressedChanged(object sender, EventArgs e)
@@ -698,31 +655,16 @@ namespace WordMan.MultiLevel
 
         private void Btn_FontColor_Click(object sender, EventArgs e)
         {
-            ColorDialog colorDialog = new ColorDialog
+            using (var dialog = new ColorDialog
             {
-                Color = Btn_FontColor.BackColor,
-                AnyColor = true,
-                SolidColorOnly = true,
-                AllowFullOpen = true,
-                FullOpen = true
-            };
-            if (colorDialog.ShowDialog(this) == DialogResult.OK)
-            {
-                Btn_FontColor.BackColor = colorDialog.Color;
-                
-                // 立即更新当前选中的样式
-                if (Dta_StyleList.SelectedRows.Count > 0)
+                Color = Btn_FontColor.BackColor, AnyColor = true, SolidColorOnly = true, AllowFullOpen = true, FullOpen = true
+            })
+                if (dialog.ShowDialog(this) == DialogResult.OK)
                 {
-                    foreach (DataGridViewRow selectedRow in Dta_StyleList.SelectedRows)
-                    {
-                        var style = LevelStyles[selectedRow.Index];
-                        style.FontColor = colorDialog.Color;
-                        
-                        // 强制刷新 DataGridView 显示
-                        Dta_StyleList.InvalidateRow(selectedRow.Index);
-                    }
+                    Btn_FontColor.BackColor = dialog.Color;
+                    // 所选颜色与首行相同也要应用到其他选中行。
+                    OnControlValueChanged(Btn_FontColor, "FontColor", "Col_FontColor");
                 }
-            }
         }
 
 
@@ -747,14 +689,33 @@ namespace WordMan.MultiLevel
 
         private void Btn_SetStyles_Click(object sender, EventArgs e)
         {
-            // 只保存样式设置，不立即应用到文档
-            // 样式将在应用多级列表时生效
-            this.DialogResult = DialogResult.OK;
-            Close();
+            try
+            {
+                float size;
+                if (!MultiLevelDataManager.TryParseFontSize(Cmb_FontSize.Text, out size))
+                    throw new ArgumentException("请输入 1 至 1638 磅之间的有效字号。");
+                if (!WordStyleInfo.IsValidLineSpacing(Cmb_LineSpacing.Text)) throw new ArgumentException("请输入有效的行距，例如 1.25倍行距、18磅或最小值18磅。");
+                ValidateChildren();
+                foreach (var field in new[] { Cmb_SpaceBefore, Cmb_SpaceAfter })
+                {
+                    float number;
+                    string text = field.Text.Replace("磅", "").Replace("行", "").Trim();
+                    if (!float.TryParse(text, out number) || float.IsNaN(number) || float.IsInfinity(number) || number < 0 || number > 1584)
+                        throw new ArgumentException("请输入有效的段前、段后间距。");
+                }
+                foreach (var style in LevelStyles) style.Validate();
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "样式设置无效：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void Btn_Cancel_Click(object sender, EventArgs e)
         {
+            DialogResult = DialogResult.Cancel;
             Close();
         }
 

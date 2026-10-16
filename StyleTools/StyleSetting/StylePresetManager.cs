@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
@@ -15,6 +15,18 @@ namespace WordMan
     /// </summary>
     public static class StylePresetManager
     {
+        public static bool IsBuiltInPreset(string name)
+        {
+            return name == "公文风格" || name == "论文风格" || name == "报告风格";
+        }
+
+        public static int GetPresetTitleCount(string name)
+        {
+            var preset = LoadCustomPresets().FirstOrDefault(x => x != null && x.Name == name);
+            if (preset != null) return preset.TitleCount;
+            return name == "公文风格" ? 6 : name == "论文风格" ? 3 : 4;
+        }
+
         /// <summary>
         /// 获取所有可用的预设样式名称（内置预设 + 用户自定义预设）
         /// </summary>
@@ -23,7 +35,7 @@ namespace WordMan
             var names = new List<string> { "公文风格", "论文风格", "报告风格" };
             foreach (var preset in LoadCustomPresets())
             {
-                if (!string.IsNullOrEmpty(preset.Name) && !names.Contains(preset.Name))
+                if (preset != null && !string.IsNullOrEmpty(preset.Name) && !names.Contains(preset.Name))
                 {
                     names.Add(preset.Name);
                 }
@@ -36,6 +48,11 @@ namespace WordMan
         /// </summary>
         public static List<CustomStyle> GetPresetStyles(string presetName)
         {
+            // 同名保存的预设优先，包括用户覆盖的内置风格。
+            var customPreset = LoadCustomPresets().FirstOrDefault(p => p != null && p.Name == presetName);
+            if (customPreset != null && customPreset.Styles != null)
+                return customPreset.Styles;
+
             switch (presetName)
             {
                 case "公文风格":
@@ -45,11 +62,6 @@ namespace WordMan
                 case "报告风格":
                     return GetReportStyles();
                 default:
-                    var customPreset = LoadCustomPresets().FirstOrDefault(p => p.Name == presetName);
-                    if (customPreset != null && customPreset.Styles != null)
-                    {
-                        return customPreset.Styles;
-                    }
                     throw new ArgumentException($"未知的预设样式：{presetName}");
             }
         }
@@ -401,11 +413,12 @@ namespace WordMan
         /// </summary>
         public static void SavePreset(StylePresetData preset)
         {
-            if (preset == null || string.IsNullOrEmpty(preset.Name))
+            if (preset == null || string.IsNullOrWhiteSpace(preset.Name))
                 return;
 
+            preset.Name = preset.Name.Trim();
             var presets = LoadCustomPresets();
-            presets.RemoveAll(p => p.Name == preset.Name);
+            presets.RemoveAll(p => p != null && p.Name == preset.Name);
             presets.Add(preset);
 
             var collection = new StylePresetCollection { Presets = presets };

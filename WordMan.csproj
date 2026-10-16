@@ -184,6 +184,10 @@
   <ItemGroup>
     <Compile Include="StyleTools\MultiLevel\ConfigurationManager.cs" />
     <Compile Include="StyleTools\MultiLevel\MultiLevelDataManager.cs" />
+    <Compile Include="StyleTools\MultiLevel\MultiLevelPresetManager.cs" />
+    <Compile Include="StyleTools\MultiLevel\MultiLevelListForm.Presets.cs">
+      <DependentUpon>MultiLevelListForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

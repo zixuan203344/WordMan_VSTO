@@ -1050,18 +1050,18 @@ namespace WordMan
 
             if (numberIndentControl != null) 
             {
-                // 直接设置Value，因为传入的已经是厘米值
-                numberIndentControl.Value = numberIndent;
+                // 保留当前显示单位，按厘米物理值换算后设置。
+                numberIndentControl.SetValueInCentimeters(numberIndent);
             }
             if (textIndentControl != null) 
             {
-                // 直接设置Value，因为传入的已经是厘米值
-                textIndentControl.Value = textIndent;
+                // 保留当前显示单位，按厘米物理值换算后设置。
+                textIndentControl.SetValueInCentimeters(textIndent);
             }
             if (tabPositionControl != null) 
             {
-                // 直接设置Value，因为传入的已经是厘米值
-                tabPositionControl.Value = tabPosition;
+                // 保留当前显示单位，按厘米物理值换算后设置。
+                tabPositionControl.SetValueInCentimeters(tabPosition);
             }
         }
 

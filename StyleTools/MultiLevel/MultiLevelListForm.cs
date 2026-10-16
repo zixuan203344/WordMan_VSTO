@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -18,13 +18,10 @@ namespace WordMan
     public partial class MultiLevelListForm : Form
     {
         #region 常量和配置
-        private const int DEFAULT_LEVELS = 0;
         private const int MAX_LEVELS = 9;
-        private const decimal DEFAULT_INDENT = 0.8m;
         
         // 魔法数字常量定义
         private const float INVALID_TAB_POSITION = 9999999f;
-        private const int DEFAULT_FONT_SIZE = 12;
         private const int MAX_INDENT_CM = 50;
         
         // 使用MultiLevelDataManager中的统一常量定义
@@ -42,19 +39,6 @@ namespace WordMan
             WdListNumberStyle.wdListNumberStyleArabic            // 9: 正规编号
         };
         
-        private static readonly Dictionary<int, LevelConfig> DefaultLevelConfigs = new Dictionary<int, LevelConfig>
-        {
-            { 1, new LevelConfig("第%1章", "标题 1", 0m) },
-            { 2, new LevelConfig("%1.%2", "标题 2", 0m) },
-            { 3, new LevelConfig("%1.%2.%3", "标题 3", 0m) },
-            { 4, new LevelConfig("%4.", "标题 4", DEFAULT_INDENT) },
-            { 5, new LevelConfig("(%5)", "标题 5", DEFAULT_INDENT) },
-            { 6, new LevelConfig("%6.", "标题 6", DEFAULT_INDENT, "A,B,C...") },
-            { 7, new LevelConfig("(%7)", "标题 7", DEFAULT_INDENT, "A,B,C...") },
-            { 8, new LevelConfig("%8.", "标题 8", DEFAULT_INDENT, "a,b,c...") },
-            { 9, new LevelConfig("(%9)", "标题 9", DEFAULT_INDENT, "a,b,c...") }
-        };
-        
         // 使用MultiLevelDataManager中的统一常量定义
         private static readonly string[] NumberStyleOptions = MultiLevelDataManager.ValidationConstants.ValidNumberStyles;
         private static readonly string[] AfterNumberOptions = MultiLevelDataManager.ValidationConstants.ValidAfterNumberTypes;
@@ -66,52 +50,10 @@ namespace WordMan
         private List<LevelData> levelDataList = new List<LevelData>();
         private Microsoft.Office.Interop.Word.Application app;
         private List<WordStyleInfo> levelStyleSettings = new List<WordStyleInfo>();
+        private Document sourceDocument;
+        private bool updatingControls;
         #endregion
         
-        #region 内部类
-        
-        /// <summary>
-        /// 级别配置类 - 存储每个级别的默认配置信息
-        /// </summary>
-        private class LevelConfig
-        {
-            /// <summary>
-            /// 编号格式（如：第%1章、%1.%2等）
-            /// </summary>
-            public string NumberFormat { get; }
-            
-            /// <summary>
-            /// 链接的样式名称
-            /// </summary>
-            public string LinkedStyle { get; }
-            
-            /// <summary>
-            /// 编号缩进值（厘米）
-            /// </summary>
-            public decimal NumberIndent { get; }
-            
-            /// <summary>
-            /// 编号样式（如：1,2,3...、A,B,C...等）
-            /// </summary>
-            public string NumberStyle { get; }
-            
-            /// <summary>
-            /// 初始化级别配置
-            /// </summary>
-            /// <param name="numberFormat">编号格式</param>
-            /// <param name="linkedStyle">链接样式</param>
-            /// <param name="numberIndent">编号缩进</param>
-            /// <param name="numberStyle">编号样式</param>
-            public LevelConfig(string numberFormat, string linkedStyle, decimal numberIndent, string numberStyle = "1,2,3...")
-            {
-                NumberFormat = numberFormat;
-                LinkedStyle = linkedStyle;
-                NumberIndent = numberIndent;
-                NumberStyle = numberStyle;
-            }
-        }
-        #endregion
-
         /// <summary>
         /// 初始化多级列表表单
         /// </summary>
@@ -126,11 +68,29 @@ namespace WordMan
             }
             
             app = Globals.ThisAddIn.Application;
+            if (app.Documents.Count > 0) sourceDocument = app.ActiveDocument;
+            ShowInTaskbar = false;
+            // 左侧原有 1050 像素宽度与右侧 350 像素重叠，导致按钮及链接列被遮挡。
+            leftPanel.Dock = DockStyle.Fill;
+            leftPanel.BringToFront();
+            ClientSize = new Size(1250, 480);
+            levelsScrollPanel.Width = leftPanel.ClientSize.Width - 30;
+            cmbLevelCount.Left = 125;
+            cmbLevelCount.Width = 60;
+            levelsContainer.MinimumSize = new Size(840, 0);
+            foreach (var input in new[] { nudNumberIndent, nudTextIndent, nudTabPosition, nudFirstLevelIndent, nudIncrementIndent })
+            {
+                // 范围由换算后的厘米值校验；不能用显示单位的 Maximum=50 限制磅值。
+                input.Maximum = 1000000m;
+                input.Minimum = -1000000m;
+                input.DecimalPlaces = 3;
+            }
             
             // 初始化表单数据、事件处理和控件
             InitializeData();
             SetupEventHandlers();
             CreateLevelControls();
+            InitializePresetControls();
         }
 
 
@@ -139,23 +99,7 @@ namespace WordMan
         /// </summary>
         private void InitializeData()
         {
-            // 为每个级别创建默认配置数据
-            for (int i = 1; i <= MAX_LEVELS; i++)
-            {
-                var config = DefaultLevelConfigs.ContainsKey(i) ? DefaultLevelConfigs[i] : new LevelConfig("", "无", 0m);
-                
-                levelDataList.Add(new LevelData
-                {
-                    Level = i,
-                    NumberStyle = config.NumberStyle,
-                    NumberFormat = config.NumberFormat,
-                    NumberIndent = config.NumberIndent,
-                    TextIndent = 0m,
-                    AfterNumberType = "空格",
-                    TabPosition = 0m,
-                    LinkedStyle = config.LinkedStyle
-                });
-            }
+            levelDataList.AddRange(MultiLevelPresetManager.CreateDefaultLevels());
 
             // 设置默认不显示任何级别
             cmbLevelCount.SetSelectedItem("0");
@@ -167,39 +111,53 @@ namespace WordMan
         /// </summary>
         private void CreateLevelControls()
         {
-            levelsContainer.Controls.Clear();
-
-            // 动态创建级别控件 - 按正确顺序（标题在上，1级在下）
-            for (int i = currentLevels; i >= 1; i--)
+            updatingControls = true;
+            levelsContainer.SuspendLayout();
+            try
             {
-                CreateLevelRow(i);
-            }
+                foreach (Control oldControl in levelsContainer.Controls.Cast<Control>().ToArray())
+                    oldControl.Dispose();
 
-            // 添加列标题 - 使用MultiLevelListControlFactory创建
-            var headerPanel = new Panel();
-            headerPanel.Height = 30;
-            headerPanel.Dock = DockStyle.Top;
-            headerPanel.BackColor = Color.Transparent;
+                // 动态创建级别控件 - 按正确顺序（标题在上，1级在下）
+                for (int i = currentLevels; i >= 1; i--)
+                {
+                    CreateLevelRow(i);
+                }
+
+                // 添加列标题 - 使用MultiLevelListControlFactory创建
+                var headerPanel = new Panel();
+                headerPanel.Height = 30;
+                headerPanel.Dock = DockStyle.Top;
+                headerPanel.BackColor = Color.Transparent;
             
-            var lblLevel = MultiLevelListControlFactory.CreateColumnHeader("级别", new Point(10, 8), new Size(50, 20));
-            var lblNumberStyle = MultiLevelListControlFactory.CreateColumnHeader("编号样式", new Point(70, 8), new Size(100, 20));
-            var lblNumberFormat = MultiLevelListControlFactory.CreateColumnHeader("编号格式", new Point(180, 8), new Size(100, 20));
-            var lblNumberIndent = MultiLevelListControlFactory.CreateColumnHeader("编号缩进", new Point(290, 8), new Size(100, 20));
-            var lblTextIndent = MultiLevelListControlFactory.CreateColumnHeader("文本缩进", new Point(400, 8), new Size(100, 20));
-            var lblAfterNumber = MultiLevelListControlFactory.CreateColumnHeader("编号之后", new Point(510, 8), new Size(100, 20));
-            var lblTabPosition = MultiLevelListControlFactory.CreateColumnHeader("制表位位置", new Point(620, 8), new Size(100, 20));
-            var lblLinkedStyle = MultiLevelListControlFactory.CreateColumnHeader("链接样式", new Point(730, 8), new Size(100, 20));
+                var lblLevel = MultiLevelListControlFactory.CreateColumnHeader("级别", new Point(10, 8), new Size(50, 20));
+                var lblNumberStyle = MultiLevelListControlFactory.CreateColumnHeader("编号样式", new Point(70, 8), new Size(100, 20));
+                var lblNumberFormat = MultiLevelListControlFactory.CreateColumnHeader("编号格式", new Point(180, 8), new Size(100, 20));
+                var lblNumberIndent = MultiLevelListControlFactory.CreateColumnHeader("编号缩进", new Point(290, 8), new Size(100, 20));
+                var lblTextIndent = MultiLevelListControlFactory.CreateColumnHeader("文本缩进", new Point(400, 8), new Size(100, 20));
+                var lblAfterNumber = MultiLevelListControlFactory.CreateColumnHeader("编号之后", new Point(510, 8), new Size(100, 20));
+                var lblTabPosition = MultiLevelListControlFactory.CreateColumnHeader("制表位位置", new Point(620, 8), new Size(100, 20));
+                var lblLinkedStyle = MultiLevelListControlFactory.CreateColumnHeader("链接样式", new Point(730, 8), new Size(100, 20));
             
-            headerPanel.Controls.AddRange(new Control[] { lblLevel, lblNumberStyle, lblNumberFormat, lblNumberIndent, lblTextIndent, lblAfterNumber, lblTabPosition, lblLinkedStyle });
-            levelsContainer.Controls.Add(headerPanel);
+                headerPanel.Controls.AddRange(new Control[] { lblLevel, lblNumberStyle, lblNumberFormat, lblNumberIndent, lblTextIndent, lblAfterNumber, lblTabPosition, lblLinkedStyle });
+                levelsContainer.Controls.Add(headerPanel);
             
-            // 设置所有级别的制表位位置启用状态
-            for (int i = 1; i <= currentLevels; i++)
-            {
-                var controls = GetLevelControls(i);
-                if (controls.AfterNumber != null && controls.TabPosition != null)
-                    controls.TabPosition.Enabled = (controls.AfterNumber.Text == "制表位");
+                // 设置所有级别的制表位位置启用状态
+                for (int i = 1; i <= currentLevels; i++)
+                {
+                    var controls = GetLevelControls(i);
+                    if (controls.AfterNumber != null && controls.TabPosition != null)
+                        controls.TabPosition.Enabled = (controls.AfterNumber.Text == "制表位");
+                }
             }
+            finally
+            {
+                levelsContainer.ResumeLayout(true);
+                updatingControls = false;
+            }
+            btnSetMultiLevelList.Enabled = currentLevels > 0;
+            btnSetLevelStyle.Enabled = currentLevels > 0;
+            btnApplySettings.Enabled = currentLevels > 0;
         }
 
 
@@ -235,7 +193,14 @@ namespace WordMan
             int afterIndex = Array.IndexOf(AfterNumberOptions, levelData.AfterNumberType);
             cmbAfterNumber.SelectedIndex = afterIndex >= 0 ? afterIndex : 1;
             int linkedIndex = Array.IndexOf(LinkedStyleOptions, levelData.LinkedStyle);
-            cmbLinkedStyle.SelectedIndex = linkedIndex >= 0 ? linkedIndex : 0;
+            if (linkedIndex < 0) linkedIndex = cmbLinkedStyle.Items.Add(levelData.LinkedStyle);
+            cmbLinkedStyle.SelectedIndex = linkedIndex;
+            foreach (var input in new[] { nudNumberIndent, nudTextIndent, nudTabPosition })
+            {
+                input.Minimum = -1000000m;
+                input.Maximum = 1000000m;
+                input.DecimalPlaces = 3;
+            }
 
             // 设置数值（使用Word API转换）
             nudNumberIndent.SetValueInCentimeters(levelData.NumberIndent);
@@ -301,7 +266,7 @@ namespace WordMan
         
         private void UpdateLevelData(int level)
         {
-            if (level < 1 || level > levelDataList.Count) return;
+            if (updatingControls || level < 1 || level > levelDataList.Count) return;
 
             var levelData = levelDataList[level - 1];
             var controls = GetLevelControls(level);
@@ -329,7 +294,7 @@ namespace WordMan
             // btnSetLevelStyle.Click 事件已在设计器中绑定
             btnLoadCurrentList.Click += BtnLoadCurrentList_Click;
             btnSetMultiLevelList.Click += BtnApply_Click;
-            btnClose.Click += btnClose_Click;
+            // 关闭事件已由设计器绑定，避免重复执行。
             btnImport.Click += btnImport_Click;
             btnExport.Click += btnExport_Click;
             btnApplySettings.Click += BtnApplySettings_Click;
@@ -345,7 +310,10 @@ namespace WordMan
 
         private void CmbLevelCount_SelectedIndexChanged(object sender, EventArgs e)
         {
-            currentLevels = int.Parse(cmbLevelCount.GetSelectedText());
+            if (updatingControls) return;
+            int selectedLevels;
+            if (!int.TryParse(cmbLevelCount.GetSelectedText(), out selectedLevels) || selectedLevels < 0 || selectedLevels > MAX_LEVELS) return;
+            currentLevels = selectedLevels;
             CreateLevelControls();
         }
 
@@ -358,216 +326,179 @@ namespace WordMan
 
         private void btnImport_Click(object sender, EventArgs e)
         {
-            string filePath = ConfigurationManager.ShowImportDialog();
-            if (!string.IsNullOrEmpty(filePath))
+            try
             {
+                string filePath = ConfigurationManager.ShowImportDialog(this);
+                if (string.IsNullOrEmpty(filePath)) return;
                 LoadConfigurationFromFile(filePath);
-                MessageBox.Show("配置导入成功！", "导入成功");
+                MessageBox.Show(this, "配置导入成功！", "导入成功");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "导入失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void btnExport_Click(object sender, EventArgs e)
         {
-            string filePath = ConfigurationManager.ShowExportDialog();
-            if (!string.IsNullOrEmpty(filePath))
+            try
             {
+                string filePath = ConfigurationManager.ShowExportDialog(this);
+                if (string.IsNullOrEmpty(filePath)) return;
                 SaveConfigurationToFile(filePath);
-                MessageBox.Show("配置导出成功！", "导出成功");
+                MessageBox.Show(this, "配置导出成功！", "导出成功");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "导出失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void BtnLoadCurrentList_Click(object sender, EventArgs e)
         {
-            // 添加空引用检查
-            if (app?.Selection == null)
+            try
             {
-                MessageBox.Show("Word应用程序或选区不可用！", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-            
-            var selection = app.Selection;
-            var listTemplate = selection.Range.ListFormat.ListTemplate;
-
-            if (listTemplate == null || listTemplate.ListLevels == null)
-            {
-                MessageBox.Show("当前位置无多级列表！", "提醒");
-                return;
-            }
-
-            int maxLevel = 1;
-            foreach (ListLevel listLevel in listTemplate.ListLevels)
-            {
-                if (listLevel.NumberFormat == "")
-                    break;
-                maxLevel = listLevel.Index;
-            }
-
-            cmbLevelCount.SetSelectedItem(maxLevel.ToString());
-            currentLevels = maxLevel;
-            CreateLevelControls();
-
-            for (int i = 1; i <= maxLevel; i++)
-            {
-                ListLevel listLevel = listTemplate.ListLevels[i];
-                var controls = GetLevelControls(i);
-
-                if (controls.NumberStyle != null)
+                if (app.Documents.Count == 0) throw new InvalidOperationException("请先打开 Word 文档。");
+                var document = app.ActiveDocument;
+                var template = app.Selection.Range.ListFormat.ListTemplate;
+                if (template == null) throw new InvalidOperationException("当前位置没有可载入的多级列表。");
+                // 先完整读取到临时集合；读取失败时保留原编辑内容。
+                var loaded = new List<LevelData>();
+                for (int i = 1; i <= MAX_LEVELS; i++)
                 {
-                    int styleIndex = GetNumberStyleIndex(listLevel.NumberStyle);
-                    controls.NumberStyle.SelectedIndex = styleIndex >= 0 ? styleIndex : 0;
+                    var level = template.ListLevels[i];
+                    if (string.IsNullOrEmpty(level.NumberFormat) || level.NumberStyle == WdListNumberStyle.wdListNumberStyleNone) break;
+                    int styleIndex = GetNumberStyleIndex(level.NumberStyle);
+                    if (styleIndex < 0) throw new InvalidOperationException("第 " + i + " 级的编号样式暂不支持，未替换当前设置。");
+                    string linkedStyle = string.IsNullOrEmpty(level.LinkedStyle) ? "无" : level.LinkedStyle;
+                    for (int heading = 1; heading <= MAX_LEVELS; heading++)
+                        if (linkedStyle == document.Styles[GetBuiltinStyleEnum(heading)].NameLocal)
+                            linkedStyle = "标题 " + heading;
+                    loaded.Add(new LevelData
+                    {
+                        Level = i,
+                        NumberStyle = NumberStyleOptions[styleIndex],
+                        NumberFormat = level.NumberFormat,
+                        NumberIndent = (decimal)app.PointsToCentimeters(level.NumberPosition),
+                        TextIndent = (decimal)app.PointsToCentimeters(level.TextPosition),
+                        AfterNumberType = level.TrailingCharacter == WdTrailingCharacter.wdTrailingTab ? "制表位" :
+                            level.TrailingCharacter == WdTrailingCharacter.wdTrailingSpace ? "空格" : "无",
+                        TabPosition = level.TabPosition >= INVALID_TAB_POSITION ? 0m : (decimal)app.PointsToCentimeters(level.TabPosition),
+                        LinkedStyle = linkedStyle,
+                        StartAt = level.StartAt,
+                        ResetOnHigher = level.ResetOnHigher
+                    });
                 }
-                
-                if (controls.NumberFormat != null)
-                    controls.NumberFormat.Text = listLevel.NumberFormat.ToString();
-                
-                if (controls.LinkedStyle != null)
-                    controls.LinkedStyle.Text = string.IsNullOrEmpty(listLevel.LinkedStyle) ? "无" : listLevel.LinkedStyle;
-                
-                decimal numberIndent = (decimal)app.PointsToCentimeters(listLevel.NumberPosition);
-                decimal textIndent = (decimal)app.PointsToCentimeters(listLevel.TextPosition);
-                decimal tabPosition = listLevel.TabPosition != INVALID_TAB_POSITION ? (decimal)app.PointsToCentimeters(listLevel.TabPosition) : 0;
-                
-                MultiLevelListControlFactory.SetInputValues(levelsContainer, i, numberIndent, textIndent, tabPosition);
+                List<string> errors;
+                if (!MultiLevelDataManager.ValidateLevelDataList(loaded, out errors))
+                    throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+                sourceDocument = document;
+                levelStyleSettings.Clear();
+                ReplaceLevelData(loaded, loaded.Count);
+                ClearPresetSelection();
+                ClearQuickSettings();
+                MessageBox.Show(this, "已载入当前多级列表设置", "成功");
             }
-
-            // 清空快捷设置
-            ClearQuickSettings();
-            MessageBox.Show("已载入当前多级列表设置", "成功");
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "载入失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private int GetNumberStyleIndex(WdListNumberStyle numberStyle)
         {
-            var styles = new[] { 
-                WdListNumberStyle.wdListNumberStyleArabic,
-                WdListNumberStyle.wdListNumberStyleArabic,
-                WdListNumberStyle.wdListNumberStyleUppercaseLetter,
-                WdListNumberStyle.wdListNumberStyleLowercaseLetter,
-                WdListNumberStyle.wdListNumberStyleUppercaseRoman,
-                WdListNumberStyle.wdListNumberStyleLowercaseRoman,
-                WdListNumberStyle.wdListNumberStyleCardinalText,
-                WdListNumberStyle.wdListNumberStyleOrdinalText,
-                WdListNumberStyle.wdListNumberStyleOrdinal,
-                WdListNumberStyle.wdListNumberStyleOrdinal
-            };
-            
-            for (int i = 0; i < styles.Length; i++)
-            {
-                if (styles[i] == numberStyle)
-                    return i;
-            }
-            return -1;
+            return Array.IndexOf(LevelNumStyle, numberStyle);
         }
 
         private void BtnApply_Click(object sender, EventArgs e)
         {
-            int levelCount = currentLevels;
-            int[] numberStyles = new int[levelCount];
-            string[] numberFormats = new string[levelCount];
-            string[] linkedStyles = new string[levelCount];
-            float[] numberIndents = new float[levelCount];
-            float[] textIndents = new float[levelCount];
-            string[] afterNumberTypes = new string[levelCount];
-            float[] tabPositions = new float[levelCount];
-
-            for (int i = 0; i < levelCount; i++)
-            {
-                var controls = GetLevelControls(i + 1);
-
-                if (controls.NumberStyle != null)
-                    numberStyles[i] = controls.NumberStyle.SelectedIndex;
-                
-                if (controls.NumberFormat != null)
-                {
-                    if (!controls.NumberFormat.Text.Contains("%" + (i + 1)))
-                    {
-                        MessageBox.Show("错误：第" + (i + 1) + "级编号格式未包含本级别的编号！");
-                        return;
-                    }
-                    numberFormats[i] = controls.NumberFormat.Text;
-                }
-                
-                if (controls.LinkedStyle != null)
-                {
-                    if (i == 0)
-                    {
-                        linkedStyles[i] = controls.LinkedStyle.Text;
-                    }
-                    else
-                    {
-                        if (linkedStyles.Contains(controls.LinkedStyle.Text) && controls.LinkedStyle.Text != "无")
-                        {
-                            MessageBox.Show("错误：第" + (i + 1) + "级链接样式出现重复！");
-                            return;
-                        }
-                        linkedStyles[i] = controls.LinkedStyle.Text;
-                    }
-                }
-                
-                if (controls.AfterNumber != null)
-                    afterNumberTypes[i] = controls.AfterNumber.Text;
-                
-                var inputValues = MultiLevelListControlFactory.GetInputValues(levelsContainer, i + 1);
-                numberIndents[i] = (float)inputValues.NumberIndent;
-                textIndents[i] = (float)inputValues.TextIndent;
-                tabPositions[i] = (float)inputValues.TabPosition;
-            }
-
-            // 创建多级列表模板（封装为一个可撤销步骤，支持 Ctrl+Z）
-            Globals.ThisAddIn.ExecuteWithUndoRecord("应用多级列表", () =>
-            {
-                CreateListTemplate(levelCount, numberStyles, numberFormats, numberIndents, textIndents, afterNumberTypes, tabPositions, linkedStyles);
-            });
-        }
-
-        private void CreateListTemplate(int levelCount, int[] numberStyles, string[] numberFormats, 
-            float[] numberIndents, float[] textIndents, string[] afterNumberTypes, float[] tabPositions, string[] linkedStyles)
-        {
-            // 验证参数
-            if (levelCount <= 0 || levelCount > MAX_LEVELS)
-            {
-                throw new ArgumentException($"级别数量无效: {levelCount}，有效范围：1-{MAX_LEVELS}");
-            }
-            
-            // 添加空引用检查
-            if (app?.ActiveDocument == null)
-            {
-                throw new InvalidOperationException("Word文档不可用，无法创建多级列表模板。");
-            }
-            
-            ListTemplate listTemplate = null;
-            ListTemplates listTemplates = null;
-            object Index = 7;
-            
             try
             {
-                // 检查当前选区是否已有列表模板
-                var selectionRange = app.Selection.Range;
-                var listFormat = selectionRange.ListFormat;
-                
-                if (listFormat.ListTemplate != null)
-                {
-                    listTemplate = listFormat.ListTemplate;
-                }
-                else
-                {
-                    // 从ListGalleries获取模板
-                    listTemplates = app.ListGalleries[WdListGalleryType.wdOutlineNumberGallery].ListTemplates;
-                    listTemplate = listTemplates[ref Index];
-                }
-                
-                ConfigureListLevels(listTemplate, levelCount, numberStyles, numberFormats, 
-                    numberIndents, textIndents, afterNumberTypes, tabPositions, linkedStyles);
-                
-                ApplyListTemplate(listTemplate, levelCount);
-                
-                // 应用样式设置（如果有的话）
-                ApplyLevelStyleSettings();
+                GetTargetDocument();
+                var activeLevels = GetValidatedLevels();
+                // 在改动 Word 之前解析所有样式引用，避免错误名称导致部分写入。
+                foreach (var level in activeLevels)
+                    if (level.LinkedStyle != "无") GetWordStyleName(level.LinkedStyle);
+                foreach (var style in levelStyleSettings.Take(currentLevels)) style.Validate();
+                Globals.ThisAddIn.ExecuteWithUndoRecord("应用多级列表", () =>
+                    CreateListTemplate(currentLevels,
+                        activeLevels.Select(x => Array.IndexOf(NumberStyleOptions, x.NumberStyle)).ToArray(),
+                        activeLevels.Select(x => x.NumberFormat).ToArray(),
+                        activeLevels.Select(x => (float)x.NumberIndent).ToArray(),
+                        activeLevels.Select(x => (float)x.TextIndent).ToArray(),
+                        activeLevels.Select(x => x.AfterNumberType).ToArray(),
+                        activeLevels.Select(x => (float)x.TabPosition).ToArray(),
+                        activeLevels.Select(x => x.LinkedStyle).ToArray()));
             }
-            finally
+            catch (Exception ex)
             {
-                // 清理COM对象引用（注意：不要释放仍在使用的对象）
-                // listTemplate 和 listTemplates 由Word管理，不需要手动释放
+                MessageBox.Show(this, "应用多级列表失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private Document GetTargetDocument()
+        {
+            if (app == null || app.Documents.Count == 0)
+                throw new InvalidOperationException("请先打开 Word 文档。");
+            var currentDocument = app.ActiveDocument;
+            if (sourceDocument != null && !ReferenceEquals(currentDocument, sourceDocument))
+                throw new InvalidOperationException("当前文档已切换。请返回原文档、重新打开本窗口，或点击“载入当前列表”后再应用。");
+            if (sourceDocument == null) sourceDocument = currentDocument;
+            return currentDocument;
+        }
+
+        private List<LevelData> GetValidatedLevels()
+        {
+            ValidateChildren();
+            for (int level = 1; level <= currentLevels; level++) UpdateLevelData(level);
+            var activeLevels = levelDataList.Take(currentLevels).ToList();
+            List<string> errors;
+            if (!MultiLevelDataManager.ValidateLevelDataList(activeLevels, out errors))
+                throw new ArgumentException(string.Join(Environment.NewLine, errors));
+            return activeLevels;
+        }
+
+        private void ReplaceLevelData(List<LevelData> loaded, int count)
+        {
+            // 始终保留九级数据槽，导入低级数后增加级数也不会越界。
+            updatingControls = true;
+            try
+            {
+                levelDataList.Clear();
+                InitializeData();
+                foreach (var level in loaded) levelDataList[level.Level - 1] = level;
+                currentLevels = count;
+                cmbLevelCount.SetSelectedItem(count.ToString());
+            }
+            finally { updatingControls = false; }
+            CreateLevelControls();
+        }
+
+        private void CreateListTemplate(int levelCount, int[] numberStyles, string[] numberFormats,
+            float[] numberIndents, float[] textIndents, string[] afterNumberTypes, float[] tabPositions, string[] linkedStyles)
+        {
+            var document = GetTargetDocument();
+            // 设置链接样式可能立即影响段落，必须先记录原选区及每段级别。
+            var targets = new List<KeyValuePair<Microsoft.Office.Interop.Word.Range, int>>();
+            var paragraphs = app.Selection.Range.Duplicate.Paragraphs;
+            for (int index = 1; index <= paragraphs.Count; index++)
+            {
+                var range = paragraphs[index].Range;
+                int level = range.ListFormat.ListLevelNumber;
+                if (level < 1 || level > levelCount) level = 1;
+                var style = range.get_Style() as Style;
+                if (style != null)
+                    for (int candidate = 1; candidate <= levelCount; candidate++)
+                        if (linkedStyles[candidate - 1] != "无" && style.NameLocal == GetWordStyleName(linkedStyles[candidate - 1]))
+                        { level = candidate; break; }
+                targets.Add(new KeyValuePair<Microsoft.Office.Interop.Word.Range, int>(range, level));
+            }
+            // 新建文档级模板，避免修改共享图库模板或选区之外的旧列表。
+            var template = document.ListTemplates.Add(true);
+            ConfigureListLevels(template, levelCount, numberStyles, numberFormats,
+                numberIndents, textIndents, afterNumberTypes, tabPositions, linkedStyles);
+            ApplyLevelStyleSettings();
+            ApplyListTemplate(template, targets);
         }
 
         /// <summary>
@@ -598,8 +529,8 @@ namespace WordMan
                 // 设置编号之后的字符类型和制表位位置
                 SetTrailingCharacter(listLevel, afterNumberTypes[i - 1], tabPositions[i - 1]);
                 
-                listLevel.StartAt = 1;
-                listLevel.ResetOnHigher = i - 1;
+                listLevel.StartAt = levelDataList[i - 1].StartAt;
+                listLevel.ResetOnHigher = levelDataList[i - 1].ResetOnHigher < 0 ? i - 1 : levelDataList[i - 1].ResetOnHigher;
             }
             
             // 清空未使用的级别
@@ -608,6 +539,7 @@ namespace WordMan
                 ListLevel listLevel = listTemplate.ListLevels[j];
                 listLevel.NumberFormat = "";
                 listLevel.NumberStyle = WdListNumberStyle.wdListNumberStyleNone;
+                listLevel.LinkedStyle = "";
             }
         }
 
@@ -616,42 +548,7 @@ namespace WordMan
         /// </summary>
         private void SetLinkedStyle(ListLevel listLevel, string linkedStyleName)
         {
-            if (string.IsNullOrEmpty(linkedStyleName) || linkedStyleName == "无")
-            {
-                listLevel.LinkedStyle = "";
-                return;
-            }
-            
-            try
-            {
-                // 提取级别数字
-                int level = 0;
-                if (int.TryParse(linkedStyleName.Replace("标题 ", "").Replace("标题", ""), out level) && level >= 1 && level <= 9)
-                {
-                    // 使用WdBuiltinStyle枚举引用内置样式
-                    WdBuiltinStyle builtInStyleEnum = GetBuiltinStyleEnum(level);
-                    var style = app.ActiveDocument.Styles[builtInStyleEnum];
-                    
-                    if (style != null)
-                    {
-                        listLevel.LinkedStyle = style.NameLocal;
-                    }
-                    else
-                    {
-                        listLevel.LinkedStyle = "";
-                    }
-                }
-                else
-                {
-                    // 如果不是标题样式，尝试通过名称查找
-                    string styleName = GetWordStyleName(linkedStyleName);
-                    listLevel.LinkedStyle = styleName;
-                }
-            }
-            catch
-            {
-                listLevel.LinkedStyle = "";
-            }
+            listLevel.LinkedStyle = GetWordStyleName(linkedStyleName);
         }
 
         /// <summary>
@@ -679,7 +576,7 @@ namespace WordMan
         /// </summary>
         private void SetTrailingCharacter(ListLevel listLevel, string afterNumberType, float tabPosition)
         {
-            if (afterNumberType == "制表位" && tabPosition > 0f)
+            if (afterNumberType == "制表位")
             {
                 listLevel.TrailingCharacter = WdTrailingCharacter.wdTrailingTab;
                 listLevel.TabPosition = app.CentimetersToPoints(tabPosition);
@@ -697,18 +594,17 @@ namespace WordMan
         /// <summary>
         /// 应用列表模板到选区
         /// </summary>
-        private void ApplyListTemplate(ListTemplate listTemplate, int levelCount)
+        private void ApplyListTemplate(ListTemplate listTemplate,
+            List<KeyValuePair<Microsoft.Office.Interop.Word.Range, int>> targets)
         {
-            // 先清除现有的列表格式
-            app.Selection.Range.ListFormat.RemoveNumbers();
-            
-            // 应用多级列表到当前选区
-            ListFormat listFormat = app.Selection.Range.ListFormat;
-            object Index = false;
-            object ApplyTo = WdListApplyTo.wdListApplyToWholeList;
-            object DefaultListBehavior = WdDefaultListBehavior.wdWord9ListBehavior;
-            object ApplyLevel2 = levelCount;
-            listFormat.ApplyListTemplateWithLevel(listTemplate, ref Index, ref ApplyTo, ref DefaultListBehavior, ref ApplyLevel2);
+            for (int index = 0; index < targets.Count; index++)
+            {
+                object continuePrevious = index > 0;
+                object applyTo = WdListApplyTo.wdListApplyToSelection;
+                object behavior = WdDefaultListBehavior.wdWord9ListBehavior;
+                object applyLevel = targets[index].Value;
+                targets[index].Key.ListFormat.ApplyListTemplateWithLevel(listTemplate, ref continuePrevious, ref applyTo, ref behavior, ref applyLevel);
+            }
         }
 
         /// <summary>
@@ -716,42 +612,31 @@ namespace WordMan
         /// </summary>
         private void ApplyLevelStyleSettings()
         {
-            if (levelStyleSettings == null || levelStyleSettings.Count == 0)
-                return;
-
-            try
-            {
-                var doc = app.ActiveDocument;
-                string errorText = string.Empty;
-                
-                foreach (WordStyleInfo style in levelStyleSettings)
-                {
-                    if (!style.SetStyle(doc))
-                    {
-                        errorText += style.StyleName + ";";
-                    }
-                }
-                
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                    MessageBox.Show("样式：" + errorText.TrimEnd(';') + " 应用时出现错误，请检查设置值是否正确！", "样式应用", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                // 移除成功提示，静默完成应用
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"应用样式设置时出现错误：{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            var document = GetTargetDocument();
+            foreach (var style in levelStyleSettings.Take(currentLevels))
+                if (!style.SetStyle(document))
+                    throw new InvalidOperationException("样式应用失败：" + style.StyleName);
         }
 
         private void BtnApplySettings_Click(object sender, EventArgs e)
         {
-            // 应用快捷设置
-            ApplyQuickSettings();
+            try { ApplyQuickSettings(); }
+            catch (Exception ex) { MessageBox.Show(this, "快捷设置失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
 
         private void ApplyQuickSettings()
         {
+            if (currentLevels == 0) throw new InvalidOperationException("请先选择列表级数。");
+            ValidateChildren();
+            // 先检查所有级别的结果，防止递进溢出或单位换算后越界导致部分更新。
+            for (int level = 1; level <= currentLevels; level++)
+            {
+                if (chkNumberIndent.Checked) ValidateQuickIndent(nudNumberIndent.GetValueInCentimeters());
+                if (chkTextIndent.Checked) ValidateQuickIndent(nudTextIndent.GetValueInCentimeters());
+                if (chkTabPosition.Checked) ValidateQuickIndent(nudTabPosition.GetValueInCentimeters());
+                if (chkProgressiveIndent.Checked)
+                    ValidateQuickIndent(nudFirstLevelIndent.GetValueInCentimeters() + nudIncrementIndent.GetValueInCentimeters() * (level - 1));
+            }
             for (int level = 1; level <= currentLevels; level++)
             {
                 var controls = GetLevelControls(level);
@@ -764,7 +649,10 @@ namespace WordMan
                     controls.TextIndent.SetValueInCentimeters(nudTextIndent.GetValueInCentimeters());
                 
                 if (chkTabPosition.Checked && controls.TabPosition != null)
+                {
+                    controls.AfterNumber.SelectedItem = "制表位";
                     controls.TabPosition.SetValueInCentimeters(nudTabPosition.GetValueInCentimeters());
+                }
 
                 // 2. 递进缩进设置
                 if (chkProgressiveIndent.Checked && controls.NumberIndent != null)
@@ -810,50 +698,23 @@ namespace WordMan
 
         private void CheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            // 编号缩进使用nudNumberIndent
-            if (chkNumberIndent.Checked) // 编号缩进
-            {
-                nudNumberIndent.Enabled = true;
-            }
-            else if (!chkNumberIndent.Checked && !chkTextIndent.Checked && !chkTabPosition.Checked)
-            {
-                nudNumberIndent.Enabled = false;
-            }
-            
-            // 文本缩进使用nudTextIndent
-            if (chkTextIndent.Checked) // 文本缩进
-            {
-                nudTextIndent.Enabled = true;
-            }
-            else if (!chkNumberIndent.Checked && !chkTextIndent.Checked && !chkTabPosition.Checked)
-            {
-                nudTextIndent.Enabled = false;
-            }
-            
-            // 制表位位置使用nudTabPosition
-            if (chkTabPosition.Checked) // 制表位位置
-            {
-                nudTabPosition.Enabled = true;
-            }
-            else if (!chkNumberIndent.Checked && !chkTextIndent.Checked && !chkTabPosition.Checked)
-            {
-                nudTabPosition.Enabled = false;
-            }
+            if (chkNumberIndent.Checked && sender == chkNumberIndent) chkProgressiveIndent.Checked = false;
+            nudNumberIndent.Enabled = chkNumberIndent.Checked;
+            nudTextIndent.Enabled = chkTextIndent.Checked;
+            nudTabPosition.Enabled = chkTabPosition.Checked;
+        }
+
+        private void ValidateQuickIndent(decimal value)
+        {
+            if (value < 0m || value > MAX_INDENT_CM)
+                throw new ArgumentOutOfRangeException("value", "缩进和制表位换算后必须在 0 至 50 厘米之间。");
         }
 
         private void ProgressiveIndent_CheckedChanged(object sender, EventArgs e)
         {
-            // 递进缩进设置
-            if (chkProgressiveIndent.Checked)
-            {
-                nudFirstLevelIndent.Enabled = true;
-                nudIncrementIndent.Enabled = true;
-            }
-            else
-            {
-                nudFirstLevelIndent.Enabled = false;
-                nudIncrementIndent.Enabled = false;
-            }
+            if (chkProgressiveIndent.Checked) chkNumberIndent.Checked = false;
+            nudFirstLevelIndent.Enabled = chkProgressiveIndent.Checked;
+            nudIncrementIndent.Enabled = chkProgressiveIndent.Checked;
         }
 
         private void LinkTitles_CheckedChanged(object sender, EventArgs e)
@@ -873,105 +734,19 @@ namespace WordMan
         }
 
 
-        private WdListNumberStyle GetNumberStyle(string styleName)
-        {
-            switch (styleName)
-            {
-                case "1,2,3...": return WdListNumberStyle.wdListNumberStyleArabic;
-                case "01,02,03...": return WdListNumberStyle.wdListNumberStyleArabic;
-                case "A,B,C...": return WdListNumberStyle.wdListNumberStyleUppercaseLetter;
-                case "a,b,c...": return WdListNumberStyle.wdListNumberStyleLowercaseLetter;
-                case "I,II,III...": return WdListNumberStyle.wdListNumberStyleUppercaseRoman;
-                case "i,ii,iii...": return WdListNumberStyle.wdListNumberStyleLowercaseRoman;
-                case "一,二,三...": return WdListNumberStyle.wdListNumberStyleCardinalText;
-                case "壹,贰,叁...": return WdListNumberStyle.wdListNumberStyleOrdinalText;
-                case "①,②,③...": return WdListNumberStyle.wdListNumberStyleOrdinal;
-                case "⑴,⑵,⑶...": return WdListNumberStyle.wdListNumberStyleOrdinal;
-                case "1),2),3)...": return WdListNumberStyle.wdListNumberStyleArabic;
-                case "(1),(2),(3)...": return WdListNumberStyle.wdListNumberStyleArabic;
-                default: return WdListNumberStyle.wdListNumberStyleArabic;
-            }
-        }
+
 
         private string GetWordStyleName(string displayName)
         {
-            // 如果已经是"无"，直接返回空字符串
-            if (displayName == "无")
-            {
-                return "";
-            }
-
-            // 提取级别数字
-            int level = 0;
-            if (!int.TryParse(displayName.Replace("标题 ", "").Replace("标题", ""), out level) || level < 1 || level > 9)
-            {
-                return "";
-            }
-
-            // 直接使用Word内置样式对象引用
-            try
-            {
-                // 使用WdBuiltinStyle枚举直接引用内置样式
-                WdBuiltinStyle builtInStyleEnum;
-                switch (level)
-                {
-                    case 1: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading1; break;
-                    case 2: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading2; break;
-                    case 3: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading3; break;
-                    case 4: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading4; break;
-                    case 5: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading5; break;
-                    case 6: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading6; break;
-                    case 7: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading7; break;
-                    case 8: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading8; break;
-                    case 9: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading9; break;
-                    default: builtInStyleEnum = WdBuiltinStyle.wdStyleHeading1; break;
-                }
-                
-                var builtInStyle = app.ActiveDocument.Styles[builtInStyleEnum];
-                
-                if (builtInStyle != null)
-                {
-                    return builtInStyle.NameLocal;
-                }
-            }
-            catch (Exception)
-            {
-                // 内置样式不可用，继续尝试其他方法
-            }
-
-            // 如果内置样式不可用，尝试通过名称查找
-            try
-            {
-                // 尝试英文名称
-                string englishName = "Heading " + level;
-                var style = app.ActiveDocument.Styles[englishName];
-                if (style != null)
-                {
-                    return style.NameLocal;
-                }
-            }
-            catch
-            {
-                // 英文样式不存在，继续尝试中文
-            }
-
-            try
-            {
-                // 尝试中文名称
-                string chineseName = "标题 " + level;
-                var style = app.ActiveDocument.Styles[chineseName];
-                if (style != null)
-                {
-                    return style.NameLocal;
-                }
-            }
-            catch
-            {
-                // 中文样式不存在
-            }
-
-            // 如果都找不到，返回空字符串（表示不链接样式）
-            return "";
+            if (string.IsNullOrEmpty(displayName) || displayName == "无") return "";
+            int level;
+            var document = GetTargetDocument();
+            if (int.TryParse(displayName.Replace("标题 ", "").Replace("标题", ""), out level) && level >= 1 && level <= MAX_LEVELS)
+                return document.Styles[GetBuiltinStyleEnum(level)].NameLocal;
+            var style = document.Styles[displayName];
+            if (style.Type != WdStyleType.wdStyleTypeParagraph && style.Type != WdStyleType.wdStyleTypeLinked)
+                throw new ArgumentException("链接样式不是段落样式：" + displayName);
+            return style.NameLocal;
         }
 
         /// <summary>
@@ -979,7 +754,8 @@ namespace WordMan
         /// </summary>
         private void SaveConfigurationToFile(string filePath)
         {
-            ConfigurationManager.SaveConfigurationToFile(filePath, levelDataList, currentLevels);
+            if (currentLevels > 0) GetValidatedLevels();
+            ConfigurationManager.SaveConfigurationToFile(filePath, levelDataList, currentLevels, levelStyleSettings);
         }
 
 
@@ -988,44 +764,14 @@ namespace WordMan
         /// </summary>
         private void LoadConfigurationFromFile(string filePath)
         {
-            ConfigurationManager.LoadConfigurationFromFile(filePath, out levelDataList, out currentLevels);
-            
-            // 更新界面
-            cmbLevelCount.SetSelectedItem(currentLevels.ToString());
-            CreateLevelControls();
-            RefreshLevelControls();
-            
-            // 强制刷新界面
-            this.Refresh();
-            levelsContainer.Refresh();
-        }
-
-        /// <summary>
-        /// 刷新级别控件显示
-        /// </summary>
-        private void RefreshLevelControls()
-        {
-            for (int level = 1; level <= currentLevels; level++)
-            {
-                var levelData = levelDataList[level - 1];
-                var controls = GetLevelControls(level);
-                
-                // 更新控件显示
-                int styleIndex = Array.IndexOf(NumberStyleOptions, levelData.NumberStyle);
-                controls.NumberStyle.SelectedIndex = styleIndex >= 0 ? styleIndex : 0;
-                controls.NumberFormat.Text = levelData.NumberFormat;
-                int afterIndex = Array.IndexOf(AfterNumberOptions, levelData.AfterNumberType);
-                controls.AfterNumber.SelectedIndex = afterIndex >= 0 ? afterIndex : 1;
-                int linkedIndex = Array.IndexOf(LinkedStyleOptions, levelData.LinkedStyle);
-                controls.LinkedStyle.SelectedIndex = linkedIndex >= 0 ? linkedIndex : 0;
-
-                // 使用MultiLevelListControlFactory设置数值
-                MultiLevelListControlFactory.SetInputValues(levelsContainer, level, levelData.NumberIndent, levelData.TextIndent, levelData.TabPosition);
-                
-                // 更新制表位位置的启用状态
-                if (controls.AfterNumber != null && controls.TabPosition != null)
-                    controls.TabPosition.Enabled = (controls.AfterNumber.Text == "制表位");
-            }
+            List<LevelData> loaded;
+            List<WordStyleInfo> loadedStyles;
+            int count;
+            ConfigurationManager.LoadConfigurationFromFile(filePath, out loaded, out count, out loadedStyles);
+            ReplaceLevelData(loaded, count);
+            levelStyleSettings = loadedStyles;
+            ClearQuickSettings();
+            ClearPresetSelection();
         }
 
         /// <summary>
@@ -1033,14 +779,7 @@ namespace WordMan
         /// </summary>
         private void BtnSetLevelStyle_Click(object sender, EventArgs e)
         {
-            // 方案1：打开样式设置窗体（当前实现）
             OpenLevelStyleSettingsForm();
-            
-            // 方案2：直接应用默认样式（注释掉）
-            // ApplyDefaultLevelStyles();
-            
-            // 方案3：打开Word内置样式对话框（注释掉）
-            // OpenWordStyleDialog();
         }
 
         /// <summary>
@@ -1048,53 +787,24 @@ namespace WordMan
         /// </summary>
         private void OpenLevelStyleSettingsForm()
         {
-            var levelStyleSettingsForm = new WordMan.MultiLevel.LevelStyleSettingsForm(currentLevels);
-            
-            // 如果有现有的样式设置，传递给窗体
-            if (levelStyleSettings != null && levelStyleSettings.Count > 0)
+            try
             {
-                levelStyleSettingsForm.LoadExistingStyles(levelStyleSettings);
+                GetTargetDocument();
+                if (currentLevels == 0) return;
+                using (var dialog = new LevelStyleSettingsForm(currentLevels))
+                {
+                    dialog.LoadExistingStyles(levelStyleSettings);
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    var hidden = levelStyleSettings.Skip(currentLevels).ToList();
+                    levelStyleSettings = dialog.GetLevelStyles();
+                    levelStyleSettings.AddRange(hidden);
+                }
             }
-            
-            if (levelStyleSettingsForm.ShowDialog(this) == DialogResult.OK)
+            catch (Exception ex)
             {
-                // 保存样式设置，但不立即应用
-                levelStyleSettings = levelStyleSettingsForm.GetLevelStyles();
+                MessageBox.Show(this, "设置每级样式失败：" + ex.Message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        /// <summary>
-        /// 应用默认级别样式（替代方案）
-        /// </summary>
-        private void ApplyDefaultLevelStyles()
-        {
-            var doc = app.ActiveDocument;
-            
-            // 为每个级别应用默认样式
-            for (int i = 1; i <= currentLevels; i++)
-            {
-                var styleName = $"标题 {i}";
-                var style = doc.Styles[styleName];
-                
-                // 设置字体
-                style.Font.Name = "微软雅黑";
-                style.Font.Size = 16 - (i - 1) * 2; // 标题1=16磅，标题2=14磅...
-                style.Font.Bold = (int)WdConstants.wdToggle;
-                
-                // 设置段落格式
-                style.ParagraphFormat.LeftIndent = app.CentimetersToPoints(i * 0.5f); // 递进缩进
-                style.ParagraphFormat.SpaceAfter = 6; // 段后间距
-                style.ParagraphFormat.LineSpacing = 1.5f; // 行距
-            }
-            
-        }
-
-        /// <summary>
-        /// 打开Word内置样式对话框（替代方案）
-        /// </summary>
-        private void OpenWordStyleDialog()
-        {
-            app.Dialogs[Microsoft.Office.Interop.Word.WdWordDialog.wdDialogFormatStyle].Show();
-        }
     }
 }

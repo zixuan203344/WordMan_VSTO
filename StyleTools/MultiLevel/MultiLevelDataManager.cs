@@ -29,6 +29,8 @@ namespace WordMan
         public string AfterNumberType { get; set; } // 编号之后类型：无、空格、制表位
         public decimal TabPosition { get; set; } // 制表位位置
         public string LinkedStyle { get; set; }
+        public int StartAt { get; set; } = 1;
+        public int ResetOnHigher { get; set; } = -1;
     }
 
     /// <summary>
@@ -56,49 +58,26 @@ namespace WordMan
         /// <summary>
         /// 转换字体大小字符串为数值
         /// </summary>
-        public static float ConvertFontSize(string fontSizeText)
+        public static float ConvertFontSize(string text)
         {
-            if (string.IsNullOrEmpty(fontSizeText))
-                return 12f;
+            float value;
+            if (!TryParseFontSize(text, out value)) throw new ArgumentException("字号无效：" + text);
+            return value;
+        }
 
-            // 移除单位后缀
-            string numberText = fontSizeText.Replace("磅", "").Replace("pt", "").Trim();
-            
-            // 处理中文字号
-            if (fontSizeText.Contains("号"))
+        public static bool TryParseFontSize(string text, out float value)
+        {
+            var chinese = new Dictionary<string, float>
             {
-                var chineseSizes = new Dictionary<string, float>
-                {
-                    {"初号", 42f}, {"小初", 36f}, {"一号", 26f}, {"小一", 24f},
-                    {"二号", 22f}, {"小二", 18f}, {"三号", 16f}, {"小三", 15f},
-                    {"四号", 14f}, {"小四", 12f}, {"五号", 10.5f}, {"小五", 9f},
-                    {"六号", 7.5f}, {"小六", 6.5f}, {"七号", 5.5f}, {"八号", 5f}
-                };
-                
-                if (chineseSizes.TryGetValue(fontSizeText, out float chineseSize))
-                    return chineseSize;
-            }
-            
-            // 尝试解析数值
-            if (float.TryParse(numberText, out float result))
-            {
-                // 如果数值小于10且不包含"磅"或"pt"，可能是中文字号，需要转换
-                if (result < 10 && !fontSizeText.Contains("磅") && !fontSizeText.Contains("pt"))
-                {
-                    var chineseToPoints = new Dictionary<float, float>
-                    {
-                        {1f, 42f}, {2f, 26f}, {3f, 16f}, {4f, 14f}, {5f, 10.5f},
-                        {6f, 7.5f}, {7f, 5.5f}, {8f, 5f}
-                    };
-                    
-                    if (chineseToPoints.TryGetValue(result, out float convertedSize))
-                        return convertedSize;
-                }
-                
-                return result;
-            }
-            
-            return 12f; // 默认值
+                {"初号", 42f}, {"小初", 36f}, {"一号", 26f}, {"小一", 24f},
+                {"二号", 22f}, {"小二", 18f}, {"三号", 16f}, {"小三", 15f},
+                {"四号", 14f}, {"小四", 12f}, {"五号", 10.5f}, {"小五", 9f},
+                {"六号", 7.5f}, {"小六", 6.5f}, {"七号", 5.5f}, {"八号", 5f}
+            };
+            text = (text ?? "").Trim();
+            if (chinese.TryGetValue(text, out value)) return true;
+            return float.TryParse(text.Replace("磅", "").Replace("pt", "").Trim(), out value) &&
+                !float.IsNaN(value) && !float.IsInfinity(value) && value >= 1f && value <= 1638f;
         }
 
         /// <summary>
@@ -139,7 +118,7 @@ namespace WordMan
             if (commonSizes.Contains(fontSize))
                 return fontSize.ToString("0") + " 磅";
             
-            return fontSize.ToString("0") + " 磅";
+            return fontSize.ToString("0.##") + " 磅";
         }
 
         #endregion
@@ -186,10 +165,12 @@ namespace WordMan
         /// </summary>
         public static bool ValidateNumberFormat(string format, int maxLevel)
         {
-            if (string.IsNullOrEmpty(format)) return true;
-            
+            if (string.IsNullOrEmpty(format) || format.Length > 255 || maxLevel < 1 || maxLevel > 9 ||
+                format.IndexOfAny(new[] { '\r', '\n', '\t' }) >= 0) return false;
             var levels = ParseNumberFormat(format);
-            return levels.All(level => level >= 1 && level <= maxLevel);
+            string literals = System.Text.RegularExpressions.Regex.Replace(format, @"%[1-9](?!\d)", "");
+            return !literals.Contains("%") && levels.Contains(maxLevel) &&
+                levels.All(level => level >= 1 && level <= maxLevel);
         }
 
         #endregion
@@ -238,6 +219,22 @@ namespace WordMan
         public static bool ValidateLevelData(LevelData levelData, out string errorMessage)
         {
             errorMessage = string.Empty;
+            if (levelData == null || levelData.Level < 1 || levelData.Level > 9)
+            {
+                errorMessage = "级别必须在 1 到 9 之间";
+                return false;
+            }
+            if (!ValidateNumberFormat(levelData.NumberFormat, levelData.Level))
+            {
+                errorMessage = "编号格式必须包含本级编号，且只能引用本级或上级编号（%1 至 %9）";
+                return false;
+            }
+            if (levelData.StartAt < 1 || levelData.StartAt > 32767 ||
+                levelData.ResetOnHigher < -1 || levelData.ResetOnHigher >= levelData.Level)
+            {
+                errorMessage = "起始编号或重新编号级别无效";
+                return false;
+            }
             
             if (!MultiLevelDataManager.ValidationHelper.IsValidNumberStyle(levelData.NumberStyle))
             {
@@ -251,7 +248,7 @@ namespace WordMan
                 return false;
             }
             
-            if (!MultiLevelDataManager.ValidationHelper.IsValidLinkedStyle(levelData.LinkedStyle))
+            if (string.IsNullOrWhiteSpace(levelData.LinkedStyle))
             {
                 errorMessage = $"无效的链接样式：{levelData.LinkedStyle}";
                 return false;
@@ -269,7 +266,7 @@ namespace WordMan
                 return false;
             }
             
-            if (levelData.AfterNumberType == "制表位" && !MultiLevelDataManager.ValidationHelper.IsValidTabPosition(levelData.TabPosition))
+            if (!MultiLevelDataManager.ValidationHelper.IsValidTabPosition(levelData.TabPosition))
             {
                 errorMessage = $"无效的制表位位置：{levelData.TabPosition}";
                 return false;
@@ -285,12 +282,29 @@ namespace WordMan
         {
             errorMessages = new List<string>();
             bool isValid = true;
+            if (levelDataList == null || levelDataList.Count == 0 || levelDataList.Count > 9)
+            {
+                errorMessages.Add("请设置 1 至 9 个级别");
+                return false;
+            }
+            if (!levelDataList.Select(x => x == null ? 0 : x.Level).OrderBy(x => x)
+                .SequenceEqual(Enumerable.Range(1, levelDataList.Count)))
+            {
+                errorMessages.Add("级别必须从 1 开始连续且不能重复");
+                return false;
+            }
+            var linkedStyles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
             foreach (var levelData in levelDataList)
             {
                 if (!ValidateLevelData(levelData, out string errorMessage))
                 {
                     errorMessages.Add($"第{levelData.Level}级：{errorMessage}");
+                    isValid = false;
+                }
+                else if (levelData.LinkedStyle != "无" && !linkedStyles.Add(levelData.LinkedStyle))
+                {
+                    errorMessages.Add($"第{levelData.Level}级：链接样式重复");
                     isValid = false;
                 }
             }
@@ -462,9 +476,9 @@ namespace WordMan
             {
                 try
                 {
-                    foreach (Font font in app.FontNames)
+                    foreach (string font in app.FontNames)
                     {
-                        fonts.Add(font.Name);
+                        fonts.Add(font);
                     }
                 }
                 catch

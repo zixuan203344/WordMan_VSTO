@@ -1,15 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace WordMan
 {
     /// <summary>
-    /// 保存预设对话框：上方名称输入框，下方一行两个按钮（确定/取消）
+    /// 保存预设对话框：可选择已有名称覆盖，也可输入新名称。
     /// </summary>
     public class SavePresetDialog : Form
     {
-        private TextBox txtName;
+        private ComboBox cmbName;
         private Button btnCancel;
         private Button btnOk;
 
@@ -18,17 +19,38 @@ namespace WordMan
         /// </summary>
         public string PresetName
         {
-            get { return txtName != null ? txtName.Text.Trim() : ""; }
+            get { return cmbName != null ? cmbName.Text.Trim() : ""; }
         }
 
-        public SavePresetDialog()
+        public SavePresetDialog() : this(StylePresetManager.GetPresetStyleNames(), null)
+        {
+        }
+
+        public SavePresetDialog(IEnumerable<string> presetNames, string selectedName)
         {
             InitializeComponent();
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            if (presetNames != null)
+            {
+                foreach (var name in presetNames)
+                {
+                    if (!string.IsNullOrWhiteSpace(name) && names.Add(name.Trim()))
+                        cmbName.Items.Add(name.Trim());
+                }
+            }
+            cmbName.Text = selectedName ?? "";
+            UpdateConfirmButton();
+            ActiveControl = cmbName;
+        }
+
+        private void UpdateConfirmButton()
+        {
+            btnOk.Enabled = !string.IsNullOrWhiteSpace(PresetName);
         }
 
         private void InitializeComponent()
         {
-            this.txtName = new TextBox();
+            this.cmbName = new ComboBox();
             this.btnCancel = new Button();
             this.btnOk = new Button();
             this.SuspendLayout();
@@ -39,6 +61,7 @@ namespace WordMan
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
+            this.ShowInTaskbar = false;
             this.StartPosition = FormStartPosition.CenterParent;
             this.Text = "保存预设";
             this.BackColor = Color.FromArgb(250, 250, 252);
@@ -55,13 +78,16 @@ namespace WordMan
             };
             this.Controls.Add(label);
 
-            // 名称输入框
-            this.txtName.Location = new Point(100, 18);
-            this.txtName.Size = new Size(220, 25);
-            this.txtName.BorderStyle = BorderStyle.FixedSingle;
-            this.txtName.Font = new Font("微软雅黑", 9F);
-            this.txtName.TabIndex = 0;
-            this.Controls.Add(this.txtName);
+            // 名称下拉框：选择和手动输入均允许，同名保存时直接覆盖。
+            this.cmbName.Location = new Point(100, 18);
+            this.cmbName.Size = new Size(220, 25);
+            this.cmbName.DropDownStyle = ComboBoxStyle.DropDown;
+            this.cmbName.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            this.cmbName.AutoCompleteSource = AutoCompleteSource.ListItems;
+            this.cmbName.Font = new Font("微软雅黑", 9F);
+            this.cmbName.TabIndex = 0;
+            this.cmbName.TextChanged += (sender, e) => UpdateConfirmButton();
+            this.Controls.Add(this.cmbName);
 
             // 取消按钮
             this.btnCancel.Text = "取消";
